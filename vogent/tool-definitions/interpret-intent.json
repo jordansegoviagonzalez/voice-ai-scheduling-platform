@@ -1,0 +1,24 @@
+{
+  "artifact_type": "vogent-api-function-configuration-blueprint",
+  "name": "interpret_intent",
+  "description": "Use backend GPT-5.2 structured outputs to extract caller scheduling intent without making routing or booking decisions.",
+  "method": "POST",
+  "url": "{{PUBLIC_APP_URL}}/api/v1/vogent/functions/interpret-intent",
+  "headers": {
+    "X-Vogent-Function-Secret": "{{VOGENT_FUNCTION_SECRET}}"
+  },
+  "inputs": [
+    { "name": "raw_user_text", "type": "STRING", "required": true },
+    { "name": "call_id", "type": "INTEGER", "required": false },
+    { "name": "patient_id", "type": "INTEGER", "required": false },
+    { "name": "previous_state", "type": "CUSTOM", "required": false }
+  ],
+  "outputs": [
+    { "name": "status", "type": "STRING", "nullable": false },
+    { "name": "intent", "type": "CUSTOM", "nullable": false },
+    { "name": "state", "type": "CUSTOM", "nullable": false },
+    { "name": "missing_fields", "type": "CUSTOM", "nullable": false },
+    { "name": "clarification_question", "type": "STRING", "nullable": true },
+    { "name": "routing", "type": "CUSTOM", "nullable": true }
+  ]
+}

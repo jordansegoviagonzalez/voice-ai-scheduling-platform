@@ -1,0 +1,25 @@
+{
+  "artifact_type": "vogent-api-function-configuration-blueprint",
+  "name": "book_appointment",
+  "description": "Revalidate physician eligibility and transactionally book the caller-confirmed slot.",
+  "method": "POST",
+  "url": "{{PUBLIC_APP_URL}}/api/v1/vogent/functions/book-appointment",
+  "headers": {
+    "X-Vogent-Function-Secret": "{{VOGENT_FUNCTION_SECRET}}"
+  },
+  "inputs": [
+    { "name": "call_id", "type": "INTEGER", "required": false },
+    { "name": "patient_id", "type": "INTEGER", "required": true },
+    { "name": "slot_id", "type": "INTEGER", "required": true },
+    { "name": "body_part", "type": "STRING", "required": true },
+    { "name": "issue_type", "type": "STRING", "required": true },
+    { "name": "confirmation_token", "type": "STRING", "required": true }
+  ],
+  "outputs": [
+    { "name": "booked", "type": "BOOLEAN", "nullable": false },
+    { "name": "appointment_id", "type": "INTEGER", "nullable": false },
+    { "name": "doctor_name", "type": "STRING", "nullable": false },
+    { "name": "location_name", "type": "STRING", "nullable": false },
+    { "name": "starts_at", "type": "STRING", "nullable": false }
+  ]
+}

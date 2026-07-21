@@ -1,0 +1,25 @@
+{
+  "artifact_type": "vogent-api-function-configuration-blueprint",
+  "name": "confirm_slot",
+  "description": "Persist explicit caller confirmation for the exact doctor, location, date, time, patient, call, and request before booking.",
+  "method": "POST",
+  "url": "{{PUBLIC_APP_URL}}/api/v1/vogent/functions/confirm-slot",
+  "headers": {
+    "X-Vogent-Function-Secret": "{{VOGENT_FUNCTION_SECRET}}"
+  },
+  "inputs": [
+    { "name": "call_id", "type": "INTEGER", "required": true },
+    { "name": "patient_id", "type": "INTEGER", "required": true },
+    { "name": "slot_id", "type": "INTEGER", "required": true },
+    { "name": "body_part", "type": "STRING", "required": true },
+    { "name": "issue_type", "type": "STRING", "required": true }
+  ],
+  "outputs": [
+    { "name": "confirmed", "type": "BOOLEAN", "nullable": false },
+    { "name": "confirmation_token", "type": "STRING", "nullable": false },
+    { "name": "doctor_name", "type": "STRING", "nullable": false },
+    { "name": "location_name", "type": "STRING", "nullable": false },
+    { "name": "starts_at", "type": "STRING", "nullable": false },
+    { "name": "expires_at", "type": "STRING", "nullable": false }
+  ]
+}

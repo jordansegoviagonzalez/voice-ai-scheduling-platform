@@ -1,0 +1,19 @@
+{
+  "artifact_type": "vogent-api-function-configuration-blueprint",
+  "name": "patient_lookup",
+  "description": "Look up a patient by phone number and date of birth.",
+  "method": "POST",
+  "url": "{{PUBLIC_APP_URL}}/api/v1/vogent/functions/patient-lookup",
+  "headers": {
+    "X-Vogent-Function-Secret": "{{VOGENT_FUNCTION_SECRET}}"
+  },
+  "inputs": [
+    { "name": "phone", "type": "STRING", "required": true },
+    { "name": "date_of_birth", "type": "STRING", "required": true, "description": "YYYY-MM-DD" }
+  ],
+  "outputs": [
+    { "name": "found", "type": "BOOLEAN", "nullable": false },
+    { "name": "patient_id", "type": "INTEGER", "nullable": true },
+    { "name": "patient_name", "type": "STRING", "nullable": true }
+  ]
+}

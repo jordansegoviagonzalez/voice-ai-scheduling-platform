@@ -1,0 +1,28 @@
+{
+  "artifact_type": "vogent-api-function-configuration-blueprint",
+  "name": "routing_recommendations",
+  "description": "Apply deterministic physician protocol rules and return real open slots.",
+  "method": "POST",
+  "url": "{{PUBLIC_APP_URL}}/api/v1/vogent/functions/routing-recommendations",
+  "headers": {
+    "X-Vogent-Function-Secret": "{{VOGENT_FUNCTION_SECRET}}"
+  },
+  "inputs": [
+    { "name": "call_id", "type": "INTEGER", "required": false },
+    { "name": "patient_id", "type": "INTEGER", "required": false },
+    { "name": "patient_status", "type": "STRING", "required": true },
+    { "name": "body_part", "type": "STRING", "required": true },
+    { "name": "issue_type", "type": "STRING", "required": true },
+    { "name": "preferred_doctor_id", "type": "INTEGER", "required": false },
+    { "name": "preferred_location_id", "type": "INTEGER", "required": false }
+  ],
+  "outputs": [
+    { "name": "summary", "type": "STRING", "nullable": false },
+    { "name": "recommended_doctor", "type": "STRING", "nullable": true },
+    { "name": "recommended_doctor_id", "type": "INTEGER", "nullable": true },
+    { "name": "available_slots", "type": "CUSTOM", "nullable": false },
+    { "name": "alternatives", "type": "CUSTOM", "nullable": false },
+    { "name": "rejections", "type": "CUSTOM", "nullable": false },
+    { "name": "fallback_explanation", "type": "STRING", "nullable": true }
+  ]
+}

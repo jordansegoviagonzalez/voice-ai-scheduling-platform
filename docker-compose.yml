@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-scheduling}
+      POSTGRES_USER: ${POSTGRES_USER:-scheduling}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scheduling}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-scheduling} -d ${POSTGRES_DB:-scheduling}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        INSTALL_DEV_DEPENDENCIES: "true"
+    environment:
+      APP_ENV: development
+      SECRET_KEY: ${SECRET_KEY:-local-development-key}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-scheduling}:${POSTGRES_PASSWORD:-scheduling}@db:5432/${POSTGRES_DB:-scheduling}
+      FRONTEND_ORIGIN: http://localhost:5173
+      PUBLIC_APP_URL: http://localhost:5173
+      LOG_LEVEL: INFO
+      VOGENT_API_KEY: ${VOGENT_API_KEY:-}
+      VOGENT_WEBHOOK_SECRET: ${VOGENT_WEBHOOK_SECRET:-}
+      VOGENT_FUNCTION_SECRET: ${VOGENT_FUNCTION_SECRET:-}
+      VOGENT_AGENT_ID: ${VOGENT_AGENT_ID:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.2}
+      OPENAI_INTEGRATION_MODE: ${OPENAI_INTEGRATION_MODE:-live}
+      ALLOW_OPENAI_TEST_MODE_IN_PRODUCTION: ${ALLOW_OPENAI_TEST_MODE_IN_PRODUCTION:-false}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-8}
+      OPENAI_MAX_RETRIES: ${OPENAI_MAX_RETRIES:-2}
+      MAX_CONTENT_LENGTH: ${MAX_CONTENT_LENGTH:-262144}
+      JSON_STRING_FIELD_MAX_LENGTH: ${JSON_STRING_FIELD_MAX_LENGTH:-8192}
+      RAW_USER_TEXT_MAX_LENGTH: ${RAW_USER_TEXT_MAX_LENGTH:-4000}
+      TRANSCRIPT_TURN_MAX_LENGTH: ${TRANSCRIPT_TURN_MAX_LENGTH:-2000}
+      TRANSCRIPT_TURN_MAX_COUNT: ${TRANSCRIPT_TURN_MAX_COUNT:-200}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-60}
+    command: >-
+      sh -c "alembic upgrade head && flask --app app:create_app seed &&
+      flask --app app:create_app run --host=0.0.0.0 --port=8000 --debug"
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal, public]
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    environment:
+      API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [public]
+
+volumes:
+  postgres_data:
+
+networks:
+  internal:
+    internal: true
+  public:
