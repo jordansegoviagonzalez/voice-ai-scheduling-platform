@@ -8,14 +8,14 @@ from flask import Blueprint, Response, current_app, jsonify, request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.normalization import normalize_phone
+from app.domain.normalization import normalize_date_of_birth, normalize_phone
 from app.domain.routing import PhysicianRoutingService, RoutingRequest
 from app.errors import ApiError
 from app.extensions import get_session
 from app.integrations.openai import OpenAIIntegrationError
 from app.integrations.vogent.security import verify_shared_secret, verify_webhook_signature
 from app.models import Call, Patient, TranscriptTurn
-from app.routes.common import bounded_string, int_or_none, json_body, parse_date, require_fields
+from app.routes.common import bounded_string, int_or_none, json_body, require_fields
 from app.services.booking import BookingService
 from app.services.confirmation import BookingConfirmationService
 from app.services.conversation import ConversationOrchestrator
@@ -75,7 +75,7 @@ def vogent_patient_lookup():  # type: ignore[no-untyped-def]
 
     def handler(session):  # type: ignore[no-untyped-def]
         phone = normalize_phone(bounded_string(payload, "phone", max_length=32) or "")
-        dob = parse_date(bounded_string(payload, "date_of_birth", max_length=10) or "", "date_of_birth")
+        dob = normalize_date_of_birth(bounded_string(payload, "date_of_birth", max_length=64) or "")
         patient = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
         return (
             {

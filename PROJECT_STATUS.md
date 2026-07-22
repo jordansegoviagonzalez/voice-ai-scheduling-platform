@@ -1,128 +1,91 @@
 # Project Status
 
-Date/time: 2026-07-21 14:07 PDT
+Date/time: 2026-07-21 20:06 PDT
 
-Current branch: `main`
+Branch: `main`
 
-Current phase: Docker-backed validation workflow fixed; GitHub push preparation complete.
+Current phase: Focused Vogent patient-lookup DOB normalization fix.
 
-Mission status: PASS for code-level pre-live hardening, local OpenAI GPT-5.2 live adapter verification, ignore-file hardening, and Docker-backed validation. BLOCKED only on Vogent credentialed callback/phone verification, public HTTPS, and AWS EC2 launch.
+Mission status: PASS for the requested backend bug fix and focused validation. No AWS, frontend, routing, booking, OpenAI, or Vogent flow changes were made.
 
 ## Work Completed
 
-- PASS - Reviewed the updated `codexmessage.md`, repository docs, current diff, recent commits, Docker state, production config, integration code, and tests before editing.
-- PASS - Normal runtime now requires `DATABASE_URL`; SQLite is allowed only for explicit `APP_ENV=test`.
-- PASS - Production requires PostgreSQL, rejects development `SECRET_KEY` placeholders, and rejects OpenAI test mode unless explicitly approved.
-- PASS - OpenAI GPT-5.2 adapter fails closed for missing key, model mismatch, auth/model/rate/network/server/timeout failures, malformed output, missing fields, extra fields, unsupported roster values, and unsafe medical/booking claims.
-- PASS - Public write and integration endpoints now enforce request-body and field-level limits.
-- PASS - Added DB-backed fixed-window rate limiting for protected public POST and Vogent endpoints.
-- PASS - Vogent replay/idempotency handling catches duplicate insert races, rejects event-key payload reuse, and prevents stale terminal-state overwrites.
-- PASS - Booking confirmation tokens use `secrets.token_urlsafe(32)` and are validated as scoped, expiring, and single-use.
-- PASS - Conversation state persists validated fields on `Call` so it can be reconstructed across backend sessions.
-- PASS - Added safe first-live helper scripts for OpenAI and Vogent readiness without running paid/live calls.
-- PASS - Diagnosed the updated root `.env` OpenAI issue without printing credential material.
-- PASS - Confirmed Compose reads `OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5.2`, and `OPENAI_INTEGRATION_MODE=live` from root `.env`.
-- PASS - Confirmed the stale backend container was created before `.env` changed and therefore lacked `OPENAI_API_KEY`.
-- PASS - Recreated only the backend container with `docker compose up -d --force-recreate backend`.
-- PASS - Verified the backend container and Flask app config now see the OpenAI key as present.
-- PASS - Ran one synthetic live GPT-5.2 structured-output request through `POST /api/v1/conversation/interpret`.
-- PASS - Verified dashboard API and headless Chrome now show `OpenAI GPT-5.2` as `Connected`.
-- PASS - Fixed backend pytest isolation so routine tests delete live `OPENAI_API_KEY` and cannot accidentally call OpenAI.
-- PASS - Hardened Git and Docker ignore rules for local env files, credentials, caches, build outputs, local databases, logs, screenshots, recordings, and Codex scratch files.
-- PASS - Removed `codexmessage.md` from Git tracking with `git rm --cached` while preserving the local ignored file.
-- PASS - Diagnosed `make test` blocker as a Makefile workflow mismatch: it required a nonexistent root `.venv` even though the documented primary workflow is Docker Compose.
-- PASS - Added dev-only backend dependencies to the development Compose build through `INSTALL_DEV_DEPENDENCIES=true`; production backend builds remain runtime-only by default.
-- PASS - Updated Makefile validation targets to run backend and frontend tests, lint, type checks, and frontend build inside Compose services.
-- PASS - Added GitHub `origin` remote for `https://github.com/jordansegoviagonzalez/voice-ai-scheduling-platform.git`.
+- PASS - Re-read the updated `codexmessage.md` instruction and kept the change scoped to `POST /api/v1/vogent/functions/patient-lookup`.
+- PASS - Added backend DOB normalization that accepts strict ISO `YYYY-MM-DD`, common spoken month/day/year input, numeric `MM/DD/YYYY` and `MM-DD-YYYY`, split-year forms such as `19 90`, and practical ordinal words such as `twelfth`.
+- PASS - Preserved existing phone normalization and the patient-lookup response schema.
+- PASS - Updated patient lookup to parse longer voice DOB strings while keeping invalid DOBs as `422 VALIDATION_ERROR` with message `date_of_birth could not be parsed.`
+- PASS - Added focused normalization tests and Vogent adapter tests for spoken DOB/phone success and unparseable DOB rejection.
+- PASS - Verified the exact requested payload returns Sarah Johnson from the running backend container.
 
 ## Files Changed
 
-- Backend config/app setup, OpenAI client, rate limiter, idempotency, confirmation, conversation, route validation, models, and migration `20260720_0003`.
-- Backend tests for config guardrails, security boundaries, OpenAI adapter failures, Vogent terminal/idempotency behavior, conversation recovery, confirmation security, and concurrency.
-- `backend/tests/conftest.py` to isolate default tests from live OpenAI credentials.
-- Compose/env/Nginx limits and production environment wiring.
-- README and docs: API, architecture, deployment, test plan, integration readiness, final QA, Vogent setup.
-- README, deployment, integration readiness, final QA, and this project status updated with the OpenAI env propagation root cause and verification result.
-- `.gitignore`, `.dockerignore`, `backend/.dockerignore`, and `frontend/.dockerignore` updated for deployment-safe ignore coverage.
-- `Makefile`, `backend/Dockerfile`, `docker-compose.yml`, and README updated so Docker-backed validation works without a root `.venv`.
-- `codexmessage.md` remains local user-edited instruction input, is ignored, and is removed from Git tracking.
+- `backend/app/domain/normalization.py`
+- `backend/app/routes/vogent.py`
+- `backend/tests/test_normalization.py`
+- `backend/tests/test_vogent_adapter.py`
+- `PROJECT_STATUS.md`
 
-## Verification
+## Migrations Added
 
-- PASS - Backend tests: `75 passed in 6.56s` after isolating pytest from live OpenAI credentials.
-- PASS - Backend Ruff format: `58 files already formatted`.
-- PASS - Backend Ruff lint: `All checks passed!`.
-- PASS - Backend mypy: `Success: no issues found in 43 source files`.
-- PASS - Frontend ESLint: passed.
-- PASS - Frontend Vitest: `3 passed` files, `9 passed` tests.
-- PASS - Frontend production build: passed with the existing Vite chunk-size warning.
-- PASS - Script syntax: `sh -n infra/scripts/verify-openai-live.sh` and `sh -n infra/scripts/verify-vogent-readiness.sh`.
-- PASS - Dev Compose config/build/up: passed.
-- PASS - Dev runtime: `db` healthy, `backend` healthy on `8000`, `frontend` running on `5173`.
-- PASS - Dev health: backend returned `{"backend":"healthy","database":"healthy","status":"ok"}`.
-- PASS - Dev frontend HTML: title is `Voice AI Scheduling Platform`.
-- PASS - No-key live OpenAI smoke: `503 OPENAI_API_KEY_MISSING`.
-- PASS - Oversized caller text smoke: `413 FIELD_TOO_LONG`.
-- PASS - Simulator preview-confirm-book smoke: call `8`, patient `12`, slot `447`, appointment `6`, call status `SCHEDULED`.
-- PASS - Alembic current: `20260720_0003 (head)`.
-- PASS - Alembic downgrade/upgrade: `20260720_0003 -> 20260720_0002 -> 20260720_0003`.
-- PASS - Seed idempotency: two consecutive seed runs produced stable counts.
-- PASS - Production Compose config/build: passed.
-- PASS - Nginx syntax: passed.
-- PASS - Gunicorn config: passed with temporary strong `SECRET_KEY`; failed fast on placeholder production `SECRET_KEY` as expected.
-- PASS - Local production proxy smoke: Nginx `/api/v1/health`, SPA `/calls`, and `413 Request Entity Too Large` checks passed.
-- PASS - Visual evidence inspected: `/private/tmp/voice-ai-scheduling-platform-desktop.png` and `/private/tmp/voice-ai-scheduling-platform-mobile.png`.
-- PASS - Safe `.env` checks: root `.env` has OpenAI config present; `.env.example` has no real OpenAI key.
-- PASS - Redacted Compose config check: backend receives OpenAI config from root `.env`.
-- PASS - Before fix: running backend container and Flask app config had no OpenAI key; dashboard OpenAI status was `Not configured`.
-- PASS - Runtime fix: `docker compose up -d --force-recreate backend`.
-- PASS - After fix: backend container and Flask app config saw OpenAI key present with model `gpt-5.2` and live mode.
-- PASS - Live OpenAI adapter smoke: `POST /api/v1/conversation/interpret` returned `200` and `clarification_required` for synthetic input through GPT-5.2.
-- PASS - Dashboard API after live request: `openai_gpt_5_2` state `connected`, status label `Connected`.
-- PASS - Browser Overview after live request: `OpenAI GPT-5.2` row rendered `Connected`.
-- PASS - Redacted dev Compose config: backend OpenAI key present, length-only check `164`, model `gpt-5.2`, mode `live`; backend publishes `8000`, frontend publishes `5173`, db publishes no host port.
-- PASS - Redacted production Compose config: backend OpenAI key present, length-only check `164`, model `gpt-5.2`, mode `live`; only Nginx publishes `80`, backend/db publish no host ports.
-- PASS - Frontend URL returned `HTTP/1.1 200 OK`.
-- PASS - Credential safety scan: tracked files, Docker logs, and known screenshot artifacts had zero exact local OpenAI key matches; tracked files had zero OpenAI-key-shaped tokens.
-- PASS - Backend dev image rebuild: `docker compose build backend` installed runtime plus `[dev]` tools only for development Compose.
-- PASS - Backend container recreate: `docker compose up -d --force-recreate backend`.
-- PASS - Backend container tool check: `pytest 8.4.2`, `ruff 0.15.22`, and `mypy 1.20.2`.
-- PASS - Docker-backed tests: `make test` returned backend `75 passed in 6.42s` and frontend Vitest `9 passed`.
-- PASS - Docker-backed lint: `make lint` returned Ruff lint/format, mypy, and frontend ESLint passing.
-- PASS - Docker-backed frontend build: `make build` passed with the existing Vite chunk-size warning.
-- PASS - Docker Compose config: `docker compose config --quiet`.
-- PASS - Backend health: `curl --fail --silent http://localhost:8000/api/v1/health` returned healthy backend/database JSON.
-- PASS - Ignore validation: `codexmessage.md`, real env files, private key/certificate/token/local database/screenshot/recording patterns are ignored; `.env.example` remains trackable.
+- None.
 
-## Seed Counts After Final Two Runs
+## Commands Run
 
-```text
-locations 3, doctors 12, doctor_locations 14, doctor_capabilities 32,
-patients 12, patient_doctor_history 6, slots 616, appointments 6,
-calls 8, transcript_turns 29, routing_decisions 182,
-booking_confirmations 3, integration_request_logs 0,
-integration_event_logs 0, api_rate_limit_buckets 0
-```
+- FAIL - `docker compose exec -T backend pytest -q tests/test_normalization.py tests/test_vogent_adapter.py`
+  - Result: collection imported the installed package path and could not see the edited helper. Retried with `python -m pytest` against the mounted `/app` source.
+- FAIL then PASS - `docker compose exec -T backend ruff check .`
+  - First result: `I001` import ordering in `backend/app/domain/normalization.py`.
+  - Final result: `All checks passed!`
+- PASS - `docker compose exec -T backend python -m pytest -q tests/test_normalization.py tests/test_vogent_adapter.py`
+  - Result: `31 passed in 1.42s`.
+- FAIL - host-side sandbox curl to `http://localhost:8000/api/v1/vogent/functions/patient-lookup`
+  - Result: could not connect to localhost from the command sandbox.
+- PASS - `docker compose ps`
+  - Result: `db`, `backend`, and `frontend` containers running; backend marked healthy and publishing `8000`.
+- PASS - in-container live HTTP validation using Python `urllib.request`
+  - Result: `{"found": true, "patient_id": 1, "patient_name": "Sarah Johnson"}` for phone `8 0 5 5 5 5 0 1 0 1` and DOB `April 12 1990`.
 
-## Known Blockers
+## Runtime Checks
 
-- BLOCKED - Vogent workspace function IDs, webhook secret, agent/phone binding, and signed callback verification require workspace access; not run.
-- BLOCKED - Public non-local HTTPS endpoint is required before live Vogent callbacks.
-- BLOCKED - Real phone call and AWS EC2 public deployment were intentionally not launched.
+- PASS - Backend container is healthy.
+- PASS - Focused backend tests passed.
+- PASS - Ruff passed.
+- PASS - Running backend endpoint returned the requested Sarah Johnson lookup result from inside the backend container.
+
+## Working Functionality
+
+- PASS - Vogent patient lookup now accepts voice-style DOB input such as `April 12 1990`.
+- PASS - Vogent patient lookup still supports ISO DOB input.
+- PASS - Numeric MDY slash/dash DOB formats are supported.
+- PASS - Split-year and ordinal spoken DOB forms are supported.
+- PASS - Unparseable DOB input returns the required `422` validation message.
+
+## Known Failures
+
+- PARTIAL - Host-side curl from this tool sandbox could not connect to `localhost:8000`, while Compose showed the backend healthy and the same endpoint succeeded from inside the backend container.
+
+## Credential-Dependent Blockers
+
+- BLOCKED - Live Vogent credentialed callback/phone verification was not run because this task only requested the local patient-lookup parsing fix.
+- BLOCKED - AWS EC2 public deployment was not touched in this task.
+
+## Deliberately Skipped
+
+- Routing, booking, frontend, OpenAI, Vogent flow artifacts, Docker architecture, AWS deployment, and README edits were intentionally not changed.
+
+## Next Task
+
+- Commit and push these focused changes if the human lead wants this checkpoint published.
 
 ## Exact Resume Command
 
 ```bash
 cd /Users/djjordan/Projects/ai-medical-scheduling-agent
 git status --short
-docker compose ps -a
+docker compose exec -T backend python -m pytest -q tests/test_normalization.py tests/test_vogent_adapter.py
 ```
 
-## Git Safety
+## Working Tree Status
 
-- Branch: `main`.
-- Remote: `origin` points to `https://github.com/jordansegoviagonzalez/voice-ai-scheduling-platform.git`.
-- `.env` remains ignored and was not staged.
-- OpenAI credentials are present only in ignored local `.env`; no credential value was printed, staged, or committed.
-- Latest commit before this checkpoint: `230a913`.
-- This checkpoint is intended to be committed with message `Prepare Voice AI Scheduling Platform for deployment` and pushed to `origin main`.
+- Modified files: `backend/app/domain/normalization.py`, `backend/app/routes/vogent.py`, `backend/tests/test_normalization.py`, `backend/tests/test_vogent_adapter.py`, `PROJECT_STATUS.md`.
+- Latest commit hash before this checkpoint: `7034e21d9cffb1f527f3f50dfb44cb9c93ab2ce9`.

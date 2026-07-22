@@ -269,3 +269,23 @@ def test_vogent_duplicate_booking_returns_stored_result(app: Flask, client: Flas
     count = session.scalar(select(func.count(Appointment.id)).where(Appointment.slot_id == slot_id))
     session.close()
     assert count == 1
+
+
+def test_vogent_patient_lookup_accepts_spoken_dob_and_spoken_phone(client: FlaskClient) -> None:
+    response = client.post(
+        "/api/v1/vogent/functions/patient-lookup",
+        json={"phone": "8 0 5 5 5 5 0 1 0 1", "date_of_birth": "April 12 1990"},
+    )
+    assert response.status_code == 200
+    assert response.get_json() == {"found": True, "patient_id": 1, "patient_name": "Sarah Johnson"}
+
+
+def test_vogent_patient_lookup_rejects_unparseable_dob(client: FlaskClient) -> None:
+    response = client.post(
+        "/api/v1/vogent/functions/patient-lookup",
+        json={"phone": "8055550101", "date_of_birth": "not a real birthday"},
+    )
+    assert response.status_code == 422
+    body = response.get_json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["message"] == "date_of_birth could not be parsed."
