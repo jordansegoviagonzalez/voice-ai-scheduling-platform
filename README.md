@@ -42,12 +42,12 @@ The core design decision is deliberate: the conversational layer may collect and
 - Password: `admin123`
 
 **Demo Returning Patient Credentials:**
-- Name: Jordan Segovia
-- Email: `jordan.patient@example.com`
-- Password: `demo123`
-- Identity fields: DOB: 1988-09-22, Phone: 805-264-4217
+- Name: Olivia Carter
+- Email: `olivia.carter.phase2.demo@example.com`
+- Password: `Patient!2026`
+- Identity fields: DOB: 1993-06-12, Phone: 805-555-0187
 
-Jordan's weak password is synthetic demonstration data only. The seed stores it as a password hash, not plaintext.
+Olivia's weak password is synthetic demonstration data only. The seed stores it as a password hash, not plaintext.
 
 **Supported functionality:**
 - Happy paths for new and returning patient scheduling.
