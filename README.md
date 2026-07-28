@@ -42,12 +42,12 @@ The core design decision is deliberate: the conversational layer may collect and
 - Password: `admin123`
 
 **Demo Returning Patient Credentials:**
-- Name: Jordan Segovia
-- Email: `jordan.patient@example.com`
-- Password: `demo123`
-- Identity fields: DOB: 1988-09-22, Phone: 805-264-4217
+- Name: Olivia Carter
+- Email: `olivia.carter.phase2.demo@example.com`
+- Password: `Patient!2026`
+- Identity fields: DOB: 1993-06-12, Phone: 805-555-0187
 
-Jordan's weak password is synthetic demonstration data only. The seed stores it as a password hash, not plaintext.
+Olivia's weak password is synthetic demonstration data only. The seed stores it as a password hash, not plaintext.
 
 **Supported functionality:**
 - Happy paths for new and returning patient scheduling.
@@ -344,7 +344,7 @@ The test suite covers Scenarios A-I, exact capability matching, per-doctor new-p
 Phase 2 was additionally smoke-tested against the local Docker PostgreSQL database and configured OpenAI provider for:
 
 - Patient entry with separate New patient and Returning patient paths before chat.
-- Returning-patient authentication creates one persisted `Welcome back, Jordan...` transcript message and no generic new-or-returning question.
+- Returning-patient authentication creates one persisted `Welcome back, Olivia...` transcript message and no generic new-or-returning question.
 - New-patient registration creates or reuses the patient record and creates one persisted `Welcome, Jose...` transcript message.
 - New-patient registration requires password and confirmation fields, rejects mismatches and short passwords, stores only a hash, and authenticates the new patient immediately.
 - Returning-patient login verifies database-backed password hashes, uses the same generic failure for unknown email and wrong password, and never exposes password hashes in API responses.
@@ -354,8 +354,8 @@ Phase 2 was additionally smoke-tested against the local Docker PostgreSQL databa
 - Failed registration and failed authentication do not create personalized welcome messages.
 - Repeated initialization and refresh restoration do not duplicate welcome messages.
 - Direct `/chat` without a valid patient session redirects to patient entry in frontend regression tests.
-- Returning-patient scheduling with Jordan Segovia.
-- Jordan Segovia right-knee sports-medicine follow-up at NORTH with earliest/morning preferences now routes to Dr. James Walsh at North Clinic with a real `2026-07-28T09:00:00+00:00` slot.
+- Returning-patient scheduling with Olivia Carter.
+- Olivia Carter right-knee sports-medicine follow-up at NORTH with earliest/morning preferences now routes to Dr. James Walsh at North Clinic with a real `2026-07-28T09:00:00+00:00` slot.
 - New-patient scheduling with synthetic patient data.
 - Invalid future date of birth and invalid severity rejection without saving the invalid value.
 - Mid-conversation corrections and correction-event persistence.
@@ -377,7 +377,7 @@ Phase 2 was additionally smoke-tested against the local Docker PostgreSQL databa
 
 Valid synthetic routing scenarios include:
 
-- Jordan Segovia, returning patient, right knee sports injury, follow-up, NORTH, earliest/morning: Dr. James Walsh, North Clinic, real morning slots.
+- Olivia Carter, returning patient, right knee sports injury, follow-up, NORTH, earliest/morning: Dr. James Walsh, North Clinic, real morning slots.
 - Sophia Martinez, new patient, left ankle pain after twisting stepping off a curb, MAIN preferred, earliest available:
   Foot/Ankle General normalizes correctly, Main Campus is searched first, and Dr. David Nguyen at North Clinic is
   offered as an explicitly labeled alternative-location appointment.

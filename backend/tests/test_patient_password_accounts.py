@@ -92,7 +92,7 @@ def test_returning_patient_login_uses_generic_failure_for_wrong_or_unknown_crede
 ) -> None:
     wrong_password = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "wrong-password"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "wrong-password"},
     )
     unknown_email = client.post(
         "/api/chat/sessions",
@@ -108,11 +108,11 @@ def test_returning_patient_login_uses_generic_failure_for_wrong_or_unknown_crede
 def test_jordan_demo_credentials_are_seeded_as_hash_and_seed_remains_idempotent(client: FlaskClient) -> None:
     first = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
-    jordan = _patient_by_email("jordan.patient@example.com")
-    original_id = jordan.id
-    original_hash = jordan.password_hash
+    olivia = _patient_by_email("olivia.carter.phase2.demo@example.com")
+    original_id = olivia.id
+    original_hash = olivia.password_hash
     original_session_id = first.get_json()["sessionId"]
 
     session = get_session_factory()()
@@ -122,25 +122,25 @@ def test_jordan_demo_credentials_are_seeded_as_hash_and_seed_remains_idempotent(
     finally:
         session.close()
 
-    refreshed = _patient_by_email("jordan.patient@example.com")
+    refreshed = _patient_by_email("olivia.carter.phase2.demo@example.com")
     assert first.status_code == 201
     assert refreshed.id == original_id
     assert refreshed.password_hash == original_hash
-    assert refreshed.password_hash != "demo123"
-    assert verify_patient_password(refreshed.password_hash, "demo123")
-    assert _patient_count("jordan.patient@example.com") == 1
+    assert refreshed.password_hash != "Patient!2026"
+    assert verify_patient_password(refreshed.password_hash, "Patient!2026")
+    assert _patient_count("olivia.carter.phase2.demo@example.com") == 1
     assert _chat_session_patient_id(original_session_id) == original_id
 
 
 def test_same_credentials_work_after_logout_and_preserve_unfinished_session(client: FlaskClient) -> None:
-    session_id = _sign_in_jordan(client)
-    before_hash = _patient_by_email("jordan.patient@example.com").password_hash
+    session_id = _sign_in_olivia(client)
+    before_hash = _patient_by_email("olivia.carter.phase2.demo@example.com").password_hash
 
     logout = client.post("/api/patient/logout")
     profile = client.get("/api/patient/profile")
     restored = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
 
     assert logout.status_code == 200
@@ -148,7 +148,7 @@ def test_same_credentials_work_after_logout_and_preserve_unfinished_session(clie
     assert restored.status_code == 200
     assert restored.get_json()["sessionId"] == session_id
     assert _chat_session_exists(session_id)
-    assert _patient_by_email("jordan.patient@example.com").password_hash == before_hash
+    assert _patient_by_email("olivia.carter.phase2.demo@example.com").password_hash == before_hash
 
 
 def test_same_credentials_work_after_session_expiration_without_modifying_password_hash(
@@ -159,14 +159,14 @@ def test_same_credentials_work_after_session_expiration_without_modifying_passwo
 
     base_time = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
     monkeypatch.setattr(session_security, "utcnow", lambda: base_time)
-    session_id = _sign_in_jordan(client)
-    before_hash = _patient_by_email("jordan.patient@example.com").password_hash
+    session_id = _sign_in_olivia(client)
+    before_hash = _patient_by_email("olivia.carter.phase2.demo@example.com").password_hash
 
     monkeypatch.setattr(session_security, "utcnow", lambda: base_time + timedelta(minutes=61))
     expired = client.get("/api/patient/profile")
     restored = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
 
     assert expired.status_code == 401
@@ -174,7 +174,7 @@ def test_same_credentials_work_after_session_expiration_without_modifying_passwo
     assert restored.status_code == 200
     assert restored.get_json()["sessionId"] == session_id
     assert _chat_session_exists(session_id)
-    assert _patient_by_email("jordan.patient@example.com").password_hash == before_hash
+    assert _patient_by_email("olivia.carter.phase2.demo@example.com").password_hash == before_hash
 
 
 def test_same_credentials_work_from_independent_browser_without_duplicate_patient(
@@ -183,40 +183,40 @@ def test_same_credentials_work_from_independent_browser_without_duplicate_patien
 ) -> None:
     first = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
     other_client = app.test_client()
     second = other_client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
 
     assert first.status_code == 201
     assert second.status_code == 200
     assert second.get_json()["sessionId"] == first.get_json()["sessionId"]
-    assert _patient_count("jordan.patient@example.com") == 1
+    assert _patient_count("olivia.carter.phase2.demo@example.com") == 1
 
 
 def test_login_restores_latest_owned_unfinished_session_without_duplicating_messages(
     app: Flask,
     client: FlaskClient,
 ) -> None:
-    jordan = _patient_by_email("jordan.patient@example.com")
+    olivia = _patient_by_email("olivia.carter.phase2.demo@example.com")
     older_id = _create_chat_session(
-        jordan.id,
+        olivia.id,
         ChatState.COLLECTING_INTAKE,
         datetime(2026, 7, 27, 12, 0, tzinfo=UTC),
         "Older unfinished session.",
     )
     latest_id = _create_chat_session(
-        jordan.id,
+        olivia.id,
         ChatState.SELECTING_APPOINTMENT,
         datetime(2026, 7, 27, 13, 0, tzinfo=UTC),
         "Latest unfinished session.",
         routing_result={"web_recommendations": [{"available_slots": []}]},
     )
     _create_chat_session(
-        jordan.id,
+        olivia.id,
         ChatState.CONFIRMED,
         datetime(2026, 7, 27, 14, 0, tzinfo=UTC),
         "Completed historical session.",
@@ -226,12 +226,12 @@ def test_login_restores_latest_owned_unfinished_session_without_duplicating_mess
 
     login = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
     other_client = app.test_client()
     second_login = other_client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
 
     assert older_id != latest_id
@@ -244,17 +244,17 @@ def test_login_restores_latest_owned_unfinished_session_without_duplicating_mess
 
 
 def test_terminal_sessions_are_not_resumed_as_unfinished_drafts(client: FlaskClient) -> None:
-    jordan = _patient_by_email("jordan.patient@example.com")
+    olivia = _patient_by_email("olivia.carter.phase2.demo@example.com")
     terminal_ids = {
         _create_chat_session(
-            jordan.id,
+            olivia.id,
             ChatState.CONFIRMED,
             datetime(2026, 7, 27, 12, 0, tzinfo=UTC),
             "Confirmed historical session.",
             completed=True,
         ),
         _create_chat_session(
-            jordan.id,
+            olivia.id,
             ChatState.ESCALATED,
             datetime(2026, 7, 27, 13, 0, tzinfo=UTC),
             "Emergency historical session.",
@@ -262,7 +262,7 @@ def test_terminal_sessions_are_not_resumed_as_unfinished_drafts(client: FlaskCli
             escalation_type="emergency",
         ),
         _create_chat_session(
-            jordan.id,
+            olivia.id,
             ChatState.CARE_TEAM_HANDOFF,
             datetime(2026, 7, 27, 14, 0, tzinfo=UTC),
             "Handoff historical session.",
@@ -273,7 +273,7 @@ def test_terminal_sessions_are_not_resumed_as_unfinished_drafts(client: FlaskCli
 
     login = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
 
     assert login.status_code == 201
@@ -291,7 +291,7 @@ def test_patient_cannot_resume_another_patient_session_even_if_session_id_is_rem
         datetime(2026, 7, 27, 12, 0, tzinfo=UTC),
         "Other patient unfinished session.",
     )
-    _sign_in_jordan(client)
+    _sign_in_olivia(client)
     with client.session_transaction() as browser_session:
         browser_session["patient_chat_session_ids"] = [other_session_id]
 
@@ -304,21 +304,21 @@ def test_patient_cannot_resume_another_patient_session_even_if_session_id_is_rem
 def test_profile_email_update_changes_future_login_identifier_without_changing_password_hash(
     client: FlaskClient,
 ) -> None:
-    _sign_in_jordan(client)
-    before_hash = _patient_by_email("jordan.patient@example.com").password_hash
+    _sign_in_olivia(client)
+    before_hash = _patient_by_email("olivia.carter.phase2.demo@example.com").password_hash
     updated = client.patch(
         "/api/patient/profile",
-        json={"email": "jordan.updated@example.test", "phone": "+18052644217"},
+        json={"email": "olivia.updated@example.test", "phone": "+18055550187"},
     )
 
     logout = client.post("/api/patient/logout")
     old_email = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
     new_email = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.updated@example.test", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.updated@example.test", "password": "Patient!2026"},
     )
 
     assert updated.status_code == 200
@@ -326,8 +326,8 @@ def test_profile_email_update_changes_future_login_identifier_without_changing_p
     assert old_email.status_code == 401
     assert old_email.get_json()["error"]["message"] == GENERIC_LOGIN_FAILURE
     assert new_email.status_code in {200, 201}
-    assert _patient_by_email("jordan.updated@example.test").password_hash == before_hash
-    assert _patient_count("jordan.patient@example.com") == 0
+    assert _patient_by_email("olivia.updated@example.test").password_hash == before_hash
+    assert _patient_count("olivia.carter.phase2.demo@example.com") == 0
 
 
 def _new_patient_payload() -> dict[str, str]:
@@ -344,10 +344,10 @@ def _new_patient_payload() -> dict[str, str]:
     }
 
 
-def _sign_in_jordan(client: FlaskClient) -> int:
+def _sign_in_olivia(client: FlaskClient) -> int:
     response = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
     assert response.status_code in {200, 201}, response.get_json()
     return int(response.get_json()["sessionId"])
@@ -436,10 +436,10 @@ def _create_chat_session(
             current_step=_step_for_status(status),
             collected_data_json={
                 "patient_type": "returning",
-                "full_name": "Jordan Segovia",
-                "date_of_birth": "1988-09-22",
-                "phone": "+18052644217",
-                "email": "jordan.patient@example.com",
+                "full_name": "Olivia Carter",
+                "date_of_birth": "1993-06-12",
+                "phone": "+18055550187",
+                "email": "olivia.carter.phase2.demo@example.com",
             },
             routing_result_json=routing_result,
             escalation_type=escalation_type,

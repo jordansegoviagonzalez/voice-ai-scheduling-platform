@@ -350,7 +350,7 @@ def test_jordan_returning_right_knee_north_follow_up_reaches_walsh_slot(
 ) -> None:
     lookup = client.post(
         "/api/v1/patients/lookup",
-        json={"phone": "805-264-4217", "date_of_birth": "1988-09-22"},
+        json={"phone": "805-555-0187", "date_of_birth": "1993-06-12"},
     ).get_json()
     result = route(
         client,

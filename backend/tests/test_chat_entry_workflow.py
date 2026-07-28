@@ -82,18 +82,18 @@ def test_failed_new_patient_registration_does_not_create_personalized_welcome(
 def test_returning_patient_authentication_creates_one_personalized_welcome(client: FlaskClient) -> None:
     response = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
 
     assert response.status_code == 201, response.get_json()
     payload = response.get_json()
     assert isinstance(payload["patient"]["id"], int)
-    assert payload["patient"]["fullName"] == "Jordan Segovia"
+    assert payload["patient"]["fullName"] == "Olivia Carter"
     assert payload["collectedData"]["patient_type"] == "returning"
     assert payload["messages"] == [
         {
             "role": "assistant",
-            "content": "Welcome back, Jordan. What is the reason for your visit today?",
+            "content": "Welcome back, Olivia. What is the reason for your visit today?",
             "sequenceNumber": 1,
         }
     ]
@@ -105,7 +105,7 @@ def test_failed_returning_patient_authentication_does_not_expose_patient_identit
 ) -> None:
     response = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "wrong-password"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "wrong-password"},
     )
 
     assert response.status_code == 401
@@ -121,11 +121,11 @@ def test_repeated_returning_patient_initialization_and_restore_do_not_duplicate_
 ) -> None:
     first = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
     second = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
     session_id = first.get_json()["sessionId"]
     restored = client.get(f"/api/chat/sessions/{session_id}")
@@ -134,10 +134,10 @@ def test_repeated_returning_patient_initialization_and_restore_do_not_duplicate_
     assert first.status_code == 201
     assert second.status_code == 200
     assert second.get_json()["sessionId"] == session_id
-    assert _welcome_count(second.get_json(), "Welcome back, Jordan. What is the reason for your visit today?") == 1
-    assert _welcome_count(restored.get_json(), "Welcome back, Jordan. What is the reason for your visit today?") == 1
+    assert _welcome_count(second.get_json(), "Welcome back, Olivia. What is the reason for your visit today?") == 1
+    assert _welcome_count(restored.get_json(), "Welcome back, Olivia. What is the reason for your visit today?") == 1
     assert (
-        _welcome_count(restored_again.get_json(), "Welcome back, Jordan. What is the reason for your visit today?") == 1
+        _welcome_count(restored_again.get_json(), "Welcome back, Olivia. What is the reason for your visit today?") == 1
     )
 
 
@@ -178,7 +178,7 @@ def test_existing_historical_chat_messages_are_not_rewritten(client: FlaskClient
 def test_unauthorized_patient_session_access_remains_blocked(client: FlaskClient, app: Flask) -> None:
     response = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "jordan.patient@example.com", "password": "demo123"},
+        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},
     )
     session_id = response.get_json()["sessionId"]
     other_client = app.test_client()

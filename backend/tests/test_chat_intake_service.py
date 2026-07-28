@@ -529,14 +529,14 @@ def _create_jordan_session_at_time_preference(
     *,
     preferred_time_of_day: str | None = None,
 ) -> int:
-    jordan = db_session.scalar(select(Patient).where(Patient.email == "jordan.patient@example.com"))
-    assert jordan is not None
+    olivia = db_session.scalar(select(Patient).where(Patient.email == "olivia.carter.phase2.demo@example.com"))
+    assert olivia is not None
     collected_data: dict[str, Any] = {
         "patient_type": "returning",
-        "full_name": jordan.full_name,
-        "date_of_birth": jordan.date_of_birth.isoformat(),
-        "phone": jordan.phone,
-        "email": jordan.email,
+        "full_name": olivia.full_name,
+        "date_of_birth": olivia.date_of_birth.isoformat(),
+        "phone": olivia.phone,
+        "email": olivia.email,
         "chief_complaint": "Right knee pain from a sports injury",
         "body_part": "Knee",
         "side": "right",
@@ -549,7 +549,7 @@ def _create_jordan_session_at_time_preference(
     if preferred_time_of_day is not None:
         collected_data["preferred_time_of_day"] = preferred_time_of_day
     chat_session = ChatSession(
-        patient_id=jordan.id,
+        patient_id=olivia.id,
         status=ChatState.COLLECTING_INTAKE,
         current_step=ChatStep.COLLECT_INTAKE,
         collected_data_json=collected_data,

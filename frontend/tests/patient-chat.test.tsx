@@ -7,10 +7,10 @@ import { ChatPage } from '../src/pages/ChatPage';
 const patientProfile = {
   firstName: 'Jordan',
   lastName: 'Segovia',
-  fullName: 'Jordan Segovia',
-  dateOfBirth: '1988-09-22',
-  email: 'jordan.patient@example.com',
-  phone: '+18052644217',
+  fullName: 'Olivia Carter',
+  dateOfBirth: '1993-06-12',
+  email: 'olivia.carter.phase2.demo@example.com',
+  phone: '+18055550187',
   insuranceProvider: 'Demo Health',
   accountCreatedAt: '2026-07-21T12:00:00+00:00',
 };
@@ -20,11 +20,11 @@ const collectingSession = {
   status: 'collecting_intake',
   currentStep: 'collect_intake',
   messages: [
-    { role: 'assistant', content: 'Welcome back, Jordan. What is the reason for your visit today?', sequenceNumber: 1 },
+    { role: 'assistant', content: 'Welcome back, Olivia. What is the reason for your visit today?', sequenceNumber: 1 },
   ],
   collectedData: {
     patient_type: 'returning',
-    full_name: 'Jordan Segovia',
+    full_name: 'Olivia Carter',
   },
   recommendations: [],
   availableSlots: [],
@@ -97,7 +97,7 @@ const confirmedSession = {
     },
     issue_type: 'Fracture',
     body_part: 'Knee',
-    patient: { full_name: 'Jordan Segovia', phone: '+18052644217', email: 'jordan.patient@example.com' },
+    patient: { full_name: 'Olivia Carter', phone: '+18055550187', email: 'olivia.carter.phase2.demo@example.com' },
   },
 };
 
@@ -153,7 +153,7 @@ it('keeps confirmed appointment details hidden until the status disclosure is ex
   const trigger = await screen.findByRole('button', { name: /scheduling progress: appointment confirmed/i });
   expect(trigger).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByText('Appointment 12')).not.toBeInTheDocument();
-  expect(screen.queryByText('+18052644217 / jordan.patient@example.com')).not.toBeInTheDocument();
+  expect(screen.queryByText('+18055550187 / olivia.carter.phase2.demo@example.com')).not.toBeInTheDocument();
 
   await userEvent.click(trigger);
 
@@ -161,7 +161,7 @@ it('keeps confirmed appointment details hidden until the status disclosure is ex
   expect(screen.getByRole('dialog', { name: /appointment confirmed details/i })).toBeInTheDocument();
   expect(screen.getByText('Appointment 12')).toBeInTheDocument();
   expect(screen.getByText('Dr. James Walsh')).toBeInTheDocument();
-  expect(screen.getByText('+18052644217 / jordan.patient@example.com')).toBeInTheDocument();
+  expect(screen.getByText('+18055550187 / olivia.carter.phase2.demo@example.com')).toBeInTheDocument();
   expect(screen.getAllByText('Appointment confirmation')).toHaveLength(1);
 
   await userEvent.keyboard('{Escape}');

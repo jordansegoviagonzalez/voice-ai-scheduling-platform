@@ -7,16 +7,16 @@ import { ChatPage } from '../src/pages/ChatPage';
 import { SignInPage } from '../src/pages/SignInPage';
 
 const genericEntryQuestion = 'Hi, I can help you schedule an orthopedic appointment. Are you a new or returning patient?';
-const jordanWelcome = 'Welcome back, Jordan. What is the reason for your visit today?';
+const jordanWelcome = 'Welcome back, Olivia. What is the reason for your visit today?';
 const joseWelcome = 'Welcome, Jose. What is the reason for your visit today?';
 const patientProfile = {
   patient: {
     firstName: 'Jordan',
     lastName: 'Segovia',
-    fullName: 'Jordan Segovia',
-    dateOfBirth: '1988-09-22',
-    email: 'jordan.patient@example.com',
-    phone: '+18052644217',
+    fullName: 'Olivia Carter',
+    dateOfBirth: '1993-06-12',
+    email: 'olivia.carter.phase2.demo@example.com',
+    phone: '+18055550187',
     insuranceProvider: null,
     accountCreatedAt: '2026-07-21T12:00:00+00:00',
   },
@@ -24,7 +24,7 @@ const patientProfile = {
 
 const returningSession = sessionPayload(51, jordanWelcome, {
   patient_type: 'returning',
-  full_name: 'Jordan Segovia',
+  full_name: 'Olivia Carter',
 });
 const newSession = sessionPayload(52, joseWelcome, {
   patient_type: 'new',
@@ -147,8 +147,8 @@ it('authenticates a returning patient and renders one personalized transcript we
 
   renderEntry('/sign-in?role=patient');
   await userEvent.click(await screen.findByRole('button', { name: /^returning patient$/i }));
-  await userEvent.type(screen.getByLabelText(/email address/i), 'jordan.patient@example.com');
-  await userEvent.type(screen.getByLabelText(/^password$/i), 'demo123');
+  await userEvent.type(screen.getByLabelText(/email address/i), 'olivia.carter.phase2.demo@example.com');
+  await userEvent.type(screen.getByLabelText(/^password$/i), 'Patient!2026');
   await userEvent.click(screen.getByRole('button', { name: /continue to scheduling chat/i }));
 
   expect(await screen.findByText(jordanWelcome)).toBeInTheDocument();
@@ -235,7 +235,7 @@ it('shows accessible errors for failed returning-patient authentication', async 
 
   renderEntry('/sign-in?role=patient');
   await userEvent.click(await screen.findByRole('button', { name: /^returning patient$/i }));
-  await userEvent.type(screen.getByLabelText(/email address/i), 'jordan.patient@example.com');
+  await userEvent.type(screen.getByLabelText(/email address/i), 'olivia.carter.phase2.demo@example.com');
   await userEvent.type(screen.getByLabelText(/^password$/i), 'wrong-password');
   await userEvent.click(screen.getByRole('button', { name: /continue to scheduling chat/i }));
 

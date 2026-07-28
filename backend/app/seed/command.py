@@ -25,8 +25,8 @@ from app.models.entities import DoctorLocation
 from app.seed.data import DOCTORS, LOCATIONS
 from app.services.patient_account_security import hash_patient_password, verify_patient_password
 
-JORDAN_DEMO_EMAIL = "jordan.patient@example.com"
-JORDAN_DEMO_PASSWORD = "demo123"
+OLIVIA_DEMO_EMAIL = "olivia.carter.phase2.demo@example.com"
+OLIVIA_DEMO_PASSWORD = "Patient!2026"
 GENERAL_ORTHOPEDICS_LAST_NAME = "Nguyen"
 CLINIC_TIMEZONE = ZoneInfo("America/Los_Angeles")
 GENERAL_ROTATION_BY_WEEKDAY = {
@@ -133,16 +133,16 @@ def seed_database(session: Session) -> None:
         ("Emily", "Davis", date(1985, 1, 18), "+18055550103", "emily@example.test"),
         ("David", "Wilson", date(1968, 7, 30), "+18055550104", None),
         ("Maya", "Patel", date(1982, 11, 6), "+18055550105", "maya@example.test"),
-        ("Jordan", "Segovia", date(1988, 9, 22), "+18052644217", JORDAN_DEMO_EMAIL),
+        ("Olivia", "Carter", date(1993, 6, 12), "+18055550187", OLIVIA_DEMO_EMAIL),
     ]
     patient_by_phone: dict[str, Patient] = {}
     for first, last, dob, phone, email in patients:
         patient = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
         if patient is None and email:
             patient = session.scalar(select(Patient).where(Patient.email == email, Patient.date_of_birth == dob))
-        if patient is None and email == JORDAN_DEMO_EMAIL:
+        if patient is None and email == OLIVIA_DEMO_EMAIL:
             patient = session.scalar(
-                select(Patient).where(Patient.phone == "805-264-4217", Patient.date_of_birth == dob)
+                select(Patient).where(Patient.phone == "805-555-0187", Patient.date_of_birth == dob)
             )
         if patient is None:
             patient = Patient(
@@ -151,18 +151,18 @@ def seed_database(session: Session) -> None:
                 date_of_birth=dob,
                 phone=phone,
                 email=email,
-                password_hash=hash_patient_password(JORDAN_DEMO_PASSWORD) if email == JORDAN_DEMO_EMAIL else None,
+                password_hash=hash_patient_password(OLIVIA_DEMO_PASSWORD) if email == OLIVIA_DEMO_EMAIL else None,
                 insurance_provider=None,
             )
             session.add(patient)
             session.flush()
         else:
-            patient.first_name = first
-            patient.last_name = last
-            patient.phone = phone
-            patient.email = email
-        if email == JORDAN_DEMO_EMAIL and not verify_patient_password(patient.password_hash, JORDAN_DEMO_PASSWORD):
-            patient.password_hash = hash_patient_password(JORDAN_DEMO_PASSWORD)
+            if email and not patient.email:
+                patient.email = email
+            if email == OLIVIA_DEMO_EMAIL and (
+                not patient.password_hash or not verify_patient_password(patient.password_hash, OLIVIA_DEMO_PASSWORD)
+            ):
+                patient.password_hash = hash_patient_password(OLIVIA_DEMO_PASSWORD)
         patient_by_phone[phone] = patient
 
     maya = patient_by_phone["+18055550105"]
