@@ -107,20 +107,24 @@ For this work trial, the patient experience now includes a minimal persistent ac
 ## Architecture
 
 ```mermaid
-flowchart LR
-    Caller[Caller] --> Vogent[Vogent voice flow]
-    Vogent --> Adapter[Flask Vogent adapter]
-    Simulator[Local call simulator] --> API[Versioned Flask API]
-    Adapter --> Domain[Deterministic domain services]
+flowchart TB
+    Caller["Caller"] --> Vogent["Vogent voice flow"]
+    Vogent --> Adapter["Flask Vogent adapter"]
+    Simulator["Local call simulator"] --> API["Versioned Flask API"]
+
+    Adapter --> Domain["Deterministic domain services"]
     API --> Domain
-    Domain --> DB[(PostgreSQL)]
-    Dashboard[React dashboard] --> API
-    Nginx[Nginx] --> Dashboard
+    Domain --> Database["PostgreSQL database"]
+
+    Nginx["Nginx and HTTPS"] --> Dashboard["React admin dashboard"]
+    Nginx --> WebChat["Patient web chat interface"]
     Nginx --> API
-    Dashboard --> WebChat[Patient Web Chat UI]
+
+    Dashboard --> API
     WebChat --> API
-    API --> AI_Intake[AI Intake Service (OpenAI GPT-5.2)]
-    AI_Intake --> Domain
+
+    API --> AIIntake["AI intake service using OpenAI GPT-5.2"]
+    AIIntake --> Domain
 ```
 
 See [Architecture](docs/ARCHITECTURE.md), [ERD](docs/ERD.md), and [Routing Rules](docs/ROUTING_RULES.md) for the complete design.
