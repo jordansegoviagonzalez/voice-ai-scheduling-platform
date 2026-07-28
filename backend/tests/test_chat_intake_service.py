@@ -438,7 +438,7 @@ def test_select_appointment_rejects_unoffered_slot(app: Flask) -> None:
         # Pick a slot that doesn't exist (999999)
         with pytest.raises(ApiError) as exc:
             workflow.select_appointment(session_id, 999999)
-        
+
         assert exc.value.status_code == 422
         assert exc.value.code == "SLOT_NOT_OFFERED"
     finally:
@@ -456,7 +456,7 @@ def test_select_appointment_requires_valid_status(app: Flask) -> None:
         # We haven't offered slots yet, session is in INTAKE
         with pytest.raises(ApiError) as exc:
             workflow.select_appointment(session_id, 101)
-        
+
         assert exc.value.status_code == 409
         assert exc.value.code == "SESSION_NOT_READY"
     finally:

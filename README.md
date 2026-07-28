@@ -552,3 +552,29 @@ Architecture and operational choices are grounded in official documentation:
 - AWS EC2: `https://docs.aws.amazon.com/ec2/`
 - pytest: `https://docs.pytest.org/`
 - Vogent: `https://docs.vogent.ai/`
+
+
+First name: Olivia
+Last name: Carter
+Date of birth: 06/12/1993
+Contact number: 805-555-0187
+Email: olivia.carter.phase2.demo@example.com
+Insurance provider: Blue Shield Demo Plan
+Password: Patient!2026
+Confirm password: Patient!2026
+
+Reason: I have right knee pain from a sports injury.
+
+Duration: It started about two weeks ago.
+
+Severity: I would rate the pain a 7 out of 10.
+
+Appointment type: This is a new-patient appointment.
+
+Location: North.
+
+Time: I would like the earliest available appointment.
+
+Admin:
+* Email: admin@example.com
+* Password: admin123

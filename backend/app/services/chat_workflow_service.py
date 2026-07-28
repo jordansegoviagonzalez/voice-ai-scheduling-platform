@@ -166,31 +166,28 @@ class ChatWorkflowService:
         chat_session = self._session_or_404(session_id)
         if chat_session.status not in {ChatState.SELECTING_APPOINTMENT, ChatState.CONFIRMED}:
             raise ApiError("SESSION_NOT_READY", "Not ready to select an appointment.", 409)
-        
+
         if not self._slot_was_offered(chat_session, slot_id):
             raise ApiError("SLOT_NOT_OFFERED", "The selected slot was not offered for this intake.", 422)
-            
+
         routing_result = dict(chat_session.routing_result_json or {})
         routing_result["selected_slot_id"] = slot_id
-        
+
         selected = self._selected_recommendation(chat_session, slot_id)
         if selected:
             routing_result["selected_recommendation"] = selected
-            
-        self.chat_service.update_session_state(
-            session_id,
-            routing_result=routing_result
-        )
+
+        self.chat_service.update_session_state(session_id, routing_result=routing_result)
         return self._session_payload(self._session_or_404(session_id))
 
     def confirm_appointment(self, session_id: int) -> tuple[dict[str, Any], int]:
         chat_session = self._session_or_404(session_id)
         if not chat_session.patient_id:
             raise ApiError("PATIENT_REQUIRED", "Patient identity is required before booking.", 422)
-            
+
         routing_result = chat_session.routing_result_json or {}
         slot_id = routing_result.get("selected_slot_id")
-        
+
         if not slot_id:
             raise ApiError("VALIDATION_ERROR", "No slot selected.", 422)
 
@@ -264,7 +261,7 @@ class ChatWorkflowService:
         app_date = appointment.slot.starts_at.astimezone(CLINIC_TIMEZONE)
         date_str = app_date.strftime("%A, %B ") + str(app_date.day)
         time_str = app_date.strftime("%I:%M %p").lstrip("0")
-        
+
         assistant = self.chat_service.add_message(
             session_id,
             "assistant",
@@ -341,14 +338,14 @@ class ChatWorkflowService:
             if not slots:
                 continue
             doctor = item["doctor"]
-            
+
             slots_by_loc: dict[int, list[dict[str, Any]]] = {}
             for slot in slots:
                 loc_id = slot["location"]["id"]
                 if loc_id not in slots_by_loc:
                     slots_by_loc[loc_id] = []
                 slots_by_loc[loc_id].append(slot)
-                
+
             locations: list[dict[str, Any]] = []
             for _loc_id, loc_slots in slots_by_loc.items():
                 first_slot = loc_slots[0]
@@ -360,15 +357,17 @@ class ChatWorkflowService:
                     loc_labels.append("Alternative location")
                 elif preferred_location is not None and first_slot["location"]["code"] == preferred_location["code"]:
                     loc_labels.append("Preferred location")
-                
-                locations.append({
-                    "clinic_location": first_slot["location"]["name"],
-                    "clinic_location_code": first_slot["location"]["code"],
-                    "is_preferred": not alternative_location if preferred_location else True,
-                    "labels": loc_labels,
-                    "available_slots": loc_slots[:6],
-                })
-            
+
+                locations.append(
+                    {
+                        "clinic_location": first_slot["location"]["name"],
+                        "clinic_location_code": first_slot["location"]["code"],
+                        "is_preferred": not alternative_location if preferred_location else True,
+                        "labels": loc_labels,
+                        "available_slots": loc_slots[:6],
+                    }
+                )
+
             # Sort locations: preferred first, then by earliest slot
             locations.sort(
                 key=lambda loc_item: (
@@ -380,9 +379,10 @@ class ChatWorkflowService:
             labels = ["Recommended"]
             if item.get("has_patient_history"):
                 labels.append("Previous physician")
-            if preferred_time and preferred_time != "any" and any(
-                _slot_matches_time(loc["available_slots"][0], preferred_time)
-                for loc in locations
+            if (
+                preferred_time
+                and preferred_time != "any"
+                and any(_slot_matches_time(loc["available_slots"][0], preferred_time) for loc in locations)
             ):
                 labels.append("Matches preferred time")
             if len(labels) == 1:
@@ -417,16 +417,13 @@ class ChatWorkflowService:
             }
             if "location_fallback" in item:
                 rec["location_fallback"] = item["location_fallback"]
-            
+
             recommendations.append(rec)
         return recommendations
 
     def _rank_slots(self, slots: list[dict[str, Any]], preferred_time: object) -> list[dict[str, Any]]:
         if preferred_time and preferred_time != "any":
-            ranked = sorted(
-                slots,
-                key=lambda slot: 0 if _slot_matches_time(slot, preferred_time) else 1
-            )
+            ranked = sorted(slots, key=lambda slot: 0 if _slot_matches_time(slot, preferred_time) else 1)
         else:
             ranked = slots
 

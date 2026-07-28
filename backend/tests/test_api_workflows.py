@@ -33,6 +33,7 @@ def test_missing_slot_id_returns_422(client: FlaskClient) -> None:
     # To test route validation purely, we just need a dummy session.
     pass
 
+
 def test_patient_lookup_creation_and_duplicate_handling(client: FlaskClient) -> None:
     payload = {
         "first_name": "Alex",
@@ -220,10 +221,12 @@ def test_dashboard_analytics_are_database_derived(client: FlaskClient) -> None:
     assert statuses["openai_gpt_5_2"]["status_label"] == "Not configured"
     assert statuses["vogent_voice_agent"]["status_label"] == "Awaiting credentials"
 
+
 def test_chat_session_json_normalizes_legacy_duration_aliases() -> None:
-    from app.services.serializers import chat_session_json
-    from types import SimpleNamespace
     from datetime import datetime
+    from types import SimpleNamespace
+
+    from app.services.serializers import chat_session_json
 
     mock_session = SimpleNamespace(
         id=1,
@@ -243,16 +246,19 @@ def test_chat_session_json_normalizes_legacy_duration_aliases() -> None:
     )
     result = chat_session_json(mock_session)
     import app.services.serializers as ser
+
     print("SERIALIZERS LOADED FROM:", ser.__file__)
     print("MOCK SESSION DATA:", mock_session.collected_data_json)
     print("RESULT DATA:", result["collected_data"])
     assert result["collected_data"]["symptom_duration"] == "4 weeks"
     assert "issue_duration" not in result["collected_data"]
 
+
 def test_chat_session_json_prefers_symptom_duration_over_legacy() -> None:
-    from app.services.serializers import chat_session_json
-    from types import SimpleNamespace
     from datetime import datetime
+    from types import SimpleNamespace
+
+    from app.services.serializers import chat_session_json
 
     mock_session = SimpleNamespace(
         id=2,

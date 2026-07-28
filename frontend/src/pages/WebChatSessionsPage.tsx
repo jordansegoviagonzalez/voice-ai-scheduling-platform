@@ -4,6 +4,7 @@ import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { apiRequest } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
 import { AppointmentSummary } from '../components/AppointmentSummary';
+import type { Appointment } from '../types/api';
 
 interface ChatSessionListItem {
   id: number;
@@ -91,7 +92,7 @@ export function WebChatSessionsPage() {
         <section className="detail-grid">
           <div className="detail-main">
             {selected.appointment ? (
-              <AppointmentSummary appointment={selected.appointment as any} />
+              <AppointmentSummary appointment={selected.appointment as unknown as Appointment} />
             ) : (
               <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'white', border: '1px solid #d9e2ec', borderRadius: '8px' }}>
                 <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Booking status</h3>

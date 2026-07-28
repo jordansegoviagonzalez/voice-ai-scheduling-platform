@@ -24,6 +24,7 @@ print("Session ID:", session_id)
 messages = [
     "My right knee hurts from a sports injury",
     "It has been going on for 3 days and the pain is level 6",
+    "It is a new patient visit",
     "I prefer the north clinic, earliest possible",
     "Yes, that is all."
 ]

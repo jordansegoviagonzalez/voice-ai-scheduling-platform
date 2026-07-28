@@ -84,7 +84,7 @@ class PhysicianRoutingService:
         rejected: list[dict[str, Any]] = []
         availability_exceptions: list[dict[str, Any]] = []
         decisions: list[RoutingDecision] = []
-        context = {
+        context: dict[str, Any] = {
             "patient_id": request.patient_id,
             "patient_status": patient_status,
             "body_part": body_part,
