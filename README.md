@@ -32,9 +32,9 @@ The core design decision is deliberate: the conversational layer may collect and
 
 ## Phase 2 URLs and Demo Credentials
 
-- **Admin Dashboard URL:** `http://localhost:5173/`
-- **Patient Entry URL:** `http://localhost:5173/sign-in?role=patient`
-- **Patient Web Chat URL:** `http://localhost:5173/chat` or `http://localhost:5173/schedule` after a valid patient session exists.
+- **Admin Dashboard URL:** `https://scheduler.jordansegovia.com/`
+- **Patient Entry URL:** `https://scheduler.jordansegovia.com/sign-in?role=patient`
+- **Patient Web Chat URL:** `https://scheduler.jordansegovia.com/chat` or `https://scheduler.jordansegovia.com/schedule` after a valid patient session exists.
 
 **Demo Admin Credentials:**
 - Name: Dr. James Walsh
