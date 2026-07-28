@@ -5,8 +5,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ChatPage } from '../src/pages/ChatPage';
 
 const patientProfile = {
-  firstName: 'Jordan',
-  lastName: 'Segovia',
+  firstName: 'Olivia',
+  lastName: 'Carter',
   fullName: 'Olivia Carter',
   dateOfBirth: '1993-06-12',
   email: 'olivia.carter.phase2.demo@example.com',
@@ -131,7 +131,7 @@ it('shows a backend-derived patient account menu separate from appointment detai
 
   renderChatRoutes('/chat');
 
-  const account = await screen.findByRole('button', { name: /jordan segovia/i });
+  const account = await screen.findByRole('button', { name: /olivia carter/i });
   expect(account).toHaveAttribute('aria-haspopup', 'menu');
 
   await userEvent.click(account);
@@ -246,7 +246,7 @@ it('signs out through the backend and clears the stored chat session', async () 
 
   renderChatRoutes('/chat');
 
-  await userEvent.click(await screen.findByRole('button', { name: /jordan segovia/i }));
+  await userEvent.click(await screen.findByRole('button', { name: /olivia carter/i }));
   await userEvent.click(screen.getByRole('menuitem', { name: /sign out/i }));
 
   expect(await screen.findByText('Patient entry route')).toBeInTheDocument();

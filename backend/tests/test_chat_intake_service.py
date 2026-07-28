@@ -283,7 +283,7 @@ def test_severity_must_be_1_to_10(message: str) -> None:
         ("any time works", "any"),
     ],
 )
-def test_valid_time_preference_advances_jordan_workflow_to_real_slots(
+def test_valid_time_preference_advances_olivia_workflow_to_real_slots(
     app: Flask, message: str, expected_time: str
 ) -> None:
     assert app.testing
@@ -291,7 +291,7 @@ def test_valid_time_preference_advances_jordan_workflow_to_real_slots(
     try:
         chat_service = ChatSessionService(db_session)
         workflow = _workflow(db_session, chat_service)
-        session_id = _create_jordan_session_at_time_preference(db_session, chat_service)
+        session_id = _create_olivia_session_at_time_preference(db_session, chat_service)
 
         payload = workflow.handle_message(session_id, message)
 
@@ -322,7 +322,7 @@ def test_ambiguous_time_preference_gets_one_concise_clarification(app: Flask) ->
     try:
         chat_service = ChatSessionService(db_session)
         workflow = _workflow(db_session, chat_service)
-        session_id = _create_jordan_session_at_time_preference(db_session, chat_service)
+        session_id = _create_olivia_session_at_time_preference(db_session, chat_service)
 
         payload = workflow.handle_message(session_id, "later maybe")
 
@@ -340,7 +340,7 @@ def test_saved_time_preference_advances_on_next_message_without_duplicate_questi
     try:
         chat_service = ChatSessionService(db_session)
         workflow = _workflow(db_session, chat_service)
-        session_id = _create_jordan_session_at_time_preference(
+        session_id = _create_olivia_session_at_time_preference(
             db_session,
             chat_service,
             preferred_time_of_day="morning",
@@ -523,7 +523,7 @@ def _workflow(db_session: Session, chat_service: ChatSessionService) -> ChatWork
     )
 
 
-def _create_jordan_session_at_time_preference(
+def _create_olivia_session_at_time_preference(
     db_session: Session,
     chat_service: ChatSessionService,
     *,

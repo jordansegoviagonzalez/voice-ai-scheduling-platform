@@ -105,7 +105,7 @@ def test_returning_patient_login_uses_generic_failure_for_wrong_or_unknown_crede
     assert unknown_email.get_json()["error"]["message"] == GENERIC_LOGIN_FAILURE
 
 
-def test_jordan_demo_credentials_are_seeded_as_hash_and_seed_remains_idempotent(client: FlaskClient) -> None:
+def test_olivia_demo_credentials_are_seeded_as_hash_and_seed_remains_idempotent(client: FlaskClient) -> None:
     first = client.post(
         "/api/chat/sessions",
         json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "Patient!2026"},

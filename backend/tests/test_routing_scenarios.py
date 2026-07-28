@@ -345,7 +345,7 @@ def test_general_orthopedics_reaches_supported_common_body_parts(client: FlaskCl
     assert any(item["doctor"]["last_name"] == "Nguyen" for item in result["ranked_recommendations"])
 
 
-def test_jordan_returning_right_knee_north_follow_up_reaches_walsh_slot(
+def test_olivia_returning_right_knee_north_follow_up_reaches_walsh_slot(
     client: FlaskClient, ids: dict[str, dict[str, int]]
 ) -> None:
     lookup = client.post(

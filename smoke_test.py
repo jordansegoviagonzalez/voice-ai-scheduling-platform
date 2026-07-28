@@ -2,9 +2,9 @@ import requests
 import json
 import time
 
-BASE_URL = "https://scheduler.jordansegovia.com/api"
-email = "jordan.patient@example.com"
-password = "demo123"
+BASE_URL = "https://scheduler.oliviacarter.com/api"
+email = "olivia.carter.phase2.demo@example.com"
+password = "Patient!2026"
 
 session = requests.Session()
 

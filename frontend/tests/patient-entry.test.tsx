@@ -7,12 +7,12 @@ import { ChatPage } from '../src/pages/ChatPage';
 import { SignInPage } from '../src/pages/SignInPage';
 
 const genericEntryQuestion = 'Hi, I can help you schedule an orthopedic appointment. Are you a new or returning patient?';
-const jordanWelcome = 'Welcome back, Olivia. What is the reason for your visit today?';
+const oliviaWelcome = 'Welcome back, Olivia. What is the reason for your visit today?';
 const joseWelcome = 'Welcome, Jose. What is the reason for your visit today?';
 const patientProfile = {
   patient: {
-    firstName: 'Jordan',
-    lastName: 'Segovia',
+    firstName: 'Olivia',
+    lastName: 'Carter',
     fullName: 'Olivia Carter',
     dateOfBirth: '1993-06-12',
     email: 'olivia.carter.phase2.demo@example.com',
@@ -22,7 +22,7 @@ const patientProfile = {
   },
 };
 
-const returningSession = sessionPayload(51, jordanWelcome, {
+const returningSession = sessionPayload(51, oliviaWelcome, {
   patient_type: 'returning',
   full_name: 'Olivia Carter',
 });
@@ -151,9 +151,9 @@ it('authenticates a returning patient and renders one personalized transcript we
   await userEvent.type(screen.getByLabelText(/^password$/i), 'Patient!2026');
   await userEvent.click(screen.getByRole('button', { name: /continue to scheduling chat/i }));
 
-  expect(await screen.findByText(jordanWelcome)).toBeInTheDocument();
+  expect(await screen.findByText(oliviaWelcome)).toBeInTheDocument();
   expect(screen.queryByText(genericEntryQuestion)).not.toBeInTheDocument();
-  expect(screen.getAllByText(jordanWelcome)).toHaveLength(1);
+  expect(screen.getAllByText(oliviaWelcome)).toHaveLength(1);
   expect(localStorage.getItem('patientChatSessionId')).toBe('51');
 });
 
@@ -216,8 +216,8 @@ it('restores an existing session without duplicating the welcome', async () => {
 
   renderChatOnly('/chat');
 
-  expect(await screen.findByText(jordanWelcome)).toBeInTheDocument();
-  expect(screen.getAllByText(jordanWelcome)).toHaveLength(1);
+  expect(await screen.findByText(oliviaWelcome)).toBeInTheDocument();
+  expect(screen.getAllByText(oliviaWelcome)).toHaveLength(1);
 });
 
 it('redirects direct chat navigation when stored session access is unauthorized', async () => {
@@ -242,7 +242,7 @@ it('shows accessible errors for failed returning-patient authentication', async 
   const alert = await screen.findByRole('alert');
   expect(alert).toHaveTextContent('We could not verify those patient details.');
   expect(alert).toHaveFocus();
-  expect(screen.queryByText(/jordan segovia/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/olivia carter/i)).not.toBeInTheDocument();
 });
 
 it('keeps admin authentication available as a separate staff path', async () => {

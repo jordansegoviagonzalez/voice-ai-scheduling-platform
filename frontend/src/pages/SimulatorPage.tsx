@@ -50,7 +50,7 @@ export function SimulatorPage() {
         }}>
           <div className="panel-head"><div><h2>Patient and request</h2><p>One focused scheduling scenario</p></div><ShieldCheck size={19} /></div>
           <div className="form-grid">
-            <label>First name<input name="first_name" defaultValue="Jordan" required /></label>
+            <label>First name<input name="first_name" defaultValue="Olivia" required /></label>
             <label>Last name<input name="last_name" defaultValue="Demo" required /></label>
             <label>Caller phone<input name="caller_phone" defaultValue="+18055550991" required /></label>
             <label>Date of birth<input name="date_of_birth" type="date" defaultValue="1991-09-15" required /></label>

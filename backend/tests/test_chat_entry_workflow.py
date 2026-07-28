@@ -111,7 +111,7 @@ def test_failed_returning_patient_authentication_does_not_expose_patient_identit
     assert response.status_code == 401
     body = response.get_json()
     assert body["error"]["message"] == "We could not verify those patient details."
-    assert "Jordan" not in str(body)
+    assert "Olivia" not in str(body)
     with client.session_transaction() as browser_session:
         assert browser_session.get("patient_chat_session_ids") in (None, [])
 

@@ -5,12 +5,12 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { PatientProfilePage } from '../src/pages/PatientProfilePage';
 
 const profile = {
-  firstName: 'Jordan',
-  lastName: 'Segovia',
-  fullName: 'Jordan Segovia',
-  dateOfBirth: '1988-09-22',
-  email: 'jordan.patient@example.com',
-  phone: '+18052644217',
+  firstName: 'Olivia',
+  lastName: 'Carter',
+  fullName: 'Olivia Carter',
+  dateOfBirth: '1993-06-12',
+  email: 'olivia.carter.phase2.demo@example.com',
+  phone: '+18055550187',
   insuranceProvider: 'Demo Health',
   accountCreatedAt: '2026-07-21T12:00:00+00:00',
 };
@@ -25,16 +25,16 @@ it('loads the authenticated patient profile without exposing Encounter date labe
 
   renderProfile();
 
-  expect(await screen.findByRole('heading', { name: /jordan segovia/i })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /olivia carter/i })).toBeInTheDocument();
   expect(screen.getByText('Account created')).toBeInTheDocument();
   expect(screen.queryByText(/encounter date/i)).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('jordan.patient@example.com')).toBeInTheDocument();
-  expect(screen.getByDisplayValue('+18052644217')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('olivia.carter.phase2.demo@example.com')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('+18055550187')).toBeInTheDocument();
   expect(screen.getByText('Demo Health')).toBeInTheDocument();
 });
 
 it('updates only email and phone and shows the saved values', async () => {
-  const updated = { ...profile, email: 'jordan.updated@example.test', phone: '+18055559002' };
+  const updated = { ...profile, email: 'olivia.updated@example.test', phone: '+18055559002' };
   mockProfileFetch({
     '/api/patient/profile': [
       { patient: profile },
@@ -45,20 +45,20 @@ it('updates only email and phone and shows the saved values', async () => {
   renderProfile();
 
   await userEvent.clear(await screen.findByLabelText(/^email$/i));
-  await userEvent.type(screen.getByLabelText(/^email$/i), 'jordan.updated@example.test');
+  await userEvent.type(screen.getByLabelText(/^email$/i), 'olivia.updated@example.test');
   await userEvent.clear(screen.getByLabelText(/phone number/i));
   await userEvent.type(screen.getByLabelText(/phone number/i), '+18055559002');
   await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
   expect(await screen.findByRole('status')).toHaveTextContent('Saved');
-  expect(screen.getByDisplayValue('jordan.updated@example.test')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('olivia.updated@example.test')).toBeInTheDocument();
   expect(screen.getByDisplayValue('+18055559002')).toBeInTheDocument();
   await waitFor(() => {
     expect(fetch).toHaveBeenCalledWith(
       '/api/patient/profile',
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ email: 'jordan.updated@example.test', phone: '+18055559002' }),
+        body: JSON.stringify({ email: 'olivia.updated@example.test', phone: '+18055559002' }),
       }),
     );
   });
@@ -80,11 +80,11 @@ it('displays structured validation errors without changing read-only fields', as
 
   renderProfile();
 
-  expect(await screen.findByLabelText(/^email$/i)).toHaveValue('jordan.patient@example.com');
+  expect(await screen.findByLabelText(/^email$/i)).toHaveValue('olivia.carter.phase2.demo@example.com');
   await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Only email and phone number can be updated.');
-  expect(screen.getByRole('heading', { name: /jordan segovia/i })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /olivia carter/i })).toBeInTheDocument();
 });
 
 it('redirects to patient sign-in when the backend session expires', async () => {
