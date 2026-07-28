@@ -37,6 +37,7 @@ def create_patient():  # type: ignore[no-untyped-def]
     phone = normalize_phone(bounded_string(payload, "phone", max_length=32) or "")
     dob = parse_date(bounded_string(payload, "date_of_birth", max_length=10) or "", "date_of_birth")
     email = bounded_string(payload, "email", max_length=255, required=False)
+    insurance_provider = bounded_string(payload, "insurance_provider", max_length=255, required=False)
     existing = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
     if existing:
         return jsonify({"created": False, "patient": patient_json(existing)}), 200
@@ -46,6 +47,7 @@ def create_patient():  # type: ignore[no-untyped-def]
         phone=phone,
         date_of_birth=dob,
         email=email,
+        insurance_provider=insurance_provider,
     )
     session.add(patient)
     try:

@@ -9,7 +9,12 @@ BODY_PARTS = {
     "Knee": {"knee", "kneecap"},
     "Hip": {"hip"},
     "Shoulder": {"shoulder"},
+    "Upper Arm": {"upper arm"},
+    "Elbow": {"elbow"},
+    "Forearm": {"forearm"},
     "Hand/Wrist": {"hand", "wrist", "hand/wrist", "hand and wrist"},
+    "Upper Leg": {"upper leg", "thigh"},
+    "Lower Leg": {"lower leg", "shin", "calf"},
     "Foot/Ankle": {"foot", "ankle", "foot/ankle", "foot and ankle"},
     "Spine": {"spine", "back", "neck"},
 }
@@ -235,7 +240,8 @@ def normalize_body_part(value: str) -> str:
             return canonical
     raise ApiError(
         "UNSUPPORTED_BODY_PART",
-        "The body part must be knee, hip, shoulder, hand/wrist, foot/ankle, or spine.",
+        "The body part must be knee, hip, shoulder, upper arm, elbow, forearm, hand/wrist, upper leg, "
+        "lower leg, foot/ankle, or spine.",
         422,
         {"body_part": ["Unsupported body part"]},
     )

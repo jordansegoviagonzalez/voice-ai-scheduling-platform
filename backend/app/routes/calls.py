@@ -26,6 +26,7 @@ def _call_query(detailed: bool = False):  # type: ignore[no-untyped-def]
         selectinload(Call.appointment).selectinload(Appointment.slot),
         selectinload(Call.appointment).selectinload(Appointment.doctor).selectinload(Doctor.locations),
         selectinload(Call.appointment).selectinload(Appointment.doctor).selectinload(Doctor.capabilities),
+        selectinload(Call.appointment).selectinload(Appointment.chat_session),
     ]
     if detailed:
         options.extend(

@@ -31,6 +31,9 @@ def test_uncertain_issue_requires_clarification() -> None:
 def test_body_part_aliases() -> None:
     assert normalize_body_part("back") == "Spine"
     assert normalize_body_part("wrist") == "Hand/Wrist"
+    assert normalize_body_part("elbow") == "Elbow"
+    assert normalize_body_part("upper arm") == "Upper Arm"
+    assert normalize_body_part("lower leg") == "Lower Leg"
 
 
 @pytest.mark.parametrize(

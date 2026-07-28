@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
+import { AuthProvider } from '../src/context/AuthContext';
 import { AppLayout } from '../src/layouts/AppLayout';
 import { OverviewPage } from '../src/pages/OverviewPage';
 
@@ -48,13 +49,15 @@ const overview = {
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('uses the Voice AI Scheduling Platform product name', () => {
+it('uses the Voice AI Scheduling Platform product name', async () => {
   const html = readFileSync('index.html', 'utf-8');
   expect(html).toContain('<title>Voice AI Scheduling Platform</title>');
   expect(html).not.toContain('MedRoute');
-  render(<MemoryRouter><AppLayout /></MemoryRouter>);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+  render(<AuthProvider><MemoryRouter><AppLayout /></MemoryRouter></AuthProvider>);
   expect(screen.getByText('Voice AI Scheduling Platform')).toBeInTheDocument();
   expect(screen.queryByText('Clinical Scheduling')).not.toBeInTheDocument();
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/auth/admin/session', { credentials: 'include' }));
 });
 
 it('renders backend-derived provider readiness states', async () => {

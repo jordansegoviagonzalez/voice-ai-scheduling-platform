@@ -17,7 +17,7 @@ seed:
 	. .venv/bin/activate && cd backend && flask --app app:create_app seed
 
 test:
-	docker compose exec -T backend pytest -q
+	docker compose exec -T -e PYTHONDONTWRITEBYTECODE=1 backend python -B -m pytest -q
 	docker compose exec -T frontend npm test -- --run
 
 lint:

@@ -21,6 +21,7 @@ def _appointment_query():  # type: ignore[no-untyped-def]
         selectinload(Appointment.doctor).selectinload(Doctor.capabilities),
         selectinload(Appointment.location),
         selectinload(Appointment.slot),
+        selectinload(Appointment.chat_session),
     )
 
 

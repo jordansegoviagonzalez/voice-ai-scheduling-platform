@@ -18,7 +18,7 @@ export function CallDetailPage() {
   return (
     <>
       <Link to="/calls" className="back-link"><ArrowLeft size={16} /> Back to calls</Link>
-      <PageHeader title={`Call #${call.id}`} subtitle={`${new Date(call.started_at).toLocaleString([], { dateStyle: 'long', timeStyle: 'short' })} · ${call.caller_phone}`} actions={<StatusBadge status={call.status} />} />
+      <PageHeader title={`Call #${call.id}`} subtitle={`${new Date(call.started_at).toLocaleString([], { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Los_Angeles' })} · ${call.caller_phone}`} actions={<StatusBadge status={call.status} />} />
       <section className="detail-grid">
         <div className="detail-main">
           {call.appointment ? <AppointmentSummary appointment={call.appointment} /> : null}

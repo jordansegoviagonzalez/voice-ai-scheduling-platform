@@ -11,6 +11,8 @@ const doctor = {
   first_name: 'Elena',
   last_name: 'Vasquez',
   full_name: 'Dr. Elena Vasquez',
+  primary_specialty: 'Lower-Extremity and Shoulder Orthopedics',
+  is_general_orthopedics: false,
   accepts_new_patients: true,
   active: true,
   locations: [{ id: 1, code: 'MAIN', name: 'Main Campus' }],
@@ -67,6 +69,7 @@ it('renders appointment summary', () => {
     status: 'SCHEDULED',
     booking_source: 'SIMULATOR',
     call_id: 1,
+    chat_session_id: null,
     created_at: '2026-07-20T10:00:00Z',
   };
   render(<AppointmentSummary appointment={appointment} />);

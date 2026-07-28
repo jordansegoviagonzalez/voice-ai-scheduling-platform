@@ -11,8 +11,13 @@ export class ApiClientError extends Error {
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  return apiRequestAbsolute<T>(`${API_BASE}${path}`, init);
+}
+
+export async function apiRequestAbsolute<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
     ...init,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...init?.headers,

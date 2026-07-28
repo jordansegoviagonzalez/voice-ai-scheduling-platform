@@ -16,6 +16,9 @@ class JsonFormatter(logging.Formatter):
         request_id = getattr(record, "request_id", None)
         if request_id:
             payload["request_id"] = request_id
+        provider_error = getattr(record, "provider_error", None)
+        if provider_error:
+            payload["provider_error"] = provider_error
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
@@ -16,6 +17,7 @@ from app.services.confirmation import BookingConfirmationService
 from app.services.serializers import appointment_json, call_json, patient_json
 
 bp = Blueprint("simulator", __name__)
+CLINIC_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 
 def _append_turn(call: Call, speaker: str, text: str, sequence: int) -> None:
@@ -162,7 +164,7 @@ def simulator_book():  # type: ignore[no-untyped-def]
         "AI",
         (
             f"Your appointment is confirmed with {appointment.doctor.full_name} at "
-            f"{appointment.location.name} on {slot.starts_at.isoformat()}."
+            f"{appointment.location.name} on {_slot_display_datetime(slot.starts_at)}."
         ),
         len(call.transcript) + 1,
     )
@@ -195,3 +197,10 @@ def simulator_confirm():  # type: ignore[no-untyped-def]
         source="SIMULATOR",
     )
     return jsonify({"confirmation_token": confirmation.confirmation_token}), 201
+
+
+def _slot_display_datetime(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    local = value.astimezone(CLINIC_TIMEZONE)
+    return f"{local:%A}, {local:%B} {local.day} at {local.strftime('%I:%M %p').lstrip('0')}"

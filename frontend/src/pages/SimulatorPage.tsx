@@ -69,7 +69,7 @@ export function SimulatorPage() {
           {!context ? <div className="simulator-placeholder"><FlaskConical /><h3>Ready to simulate</h3><p>Submit the request to create a patient, call record, transcript, and routing audit.</p></div> : <>
             <div className="routing-summary"><CheckCircle2 /><p>{context.routing.caller_safe_summary}</p></div>
             {context.routing.rejected_doctors.filter((item) => item.is_preferred_doctor).map((item) => <div className="rejection-card" key={item.doctor.id}><strong>{item.doctor.full_name} was not selected</strong><p>{item.reason}</p></div>)}
-            {context.routing.ranked_recommendations.map((item, index) => <article className="recommendation-card" key={item.doctor.id}><div><span>Option {index + 1}</span><h3>{item.doctor.full_name}</h3><p>{item.available_slots[0]?.location.name}</p></div><div className="slot-buttons">{item.available_slots.slice(0, 3).map((slot) => <button className="button secondary" type="button" key={slot.id} disabled={booking.isPending || Boolean(appointment)} onClick={() => booking.mutate({ call_id: context.callId, patient_id: context.patientId, slot_id: slot.id, body_part: context.bodyPart, issue_type: context.issueType })}>{new Date(slot.starts_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</button>)}</div></article>)}
+            {context.routing.ranked_recommendations.map((item, index) => <article className="recommendation-card" key={item.doctor.id}><div><span>Option {index + 1}</span><h3>{item.doctor.full_name}</h3><p>{item.available_slots[0]?.location.name}</p></div><div className="slot-buttons">{item.available_slots.slice(0, 3).map((slot) => <button className="button secondary" type="button" key={slot.id} disabled={booking.isPending || Boolean(appointment)} onClick={() => booking.mutate({ call_id: context.callId, patient_id: context.patientId, slot_id: slot.id, body_part: context.bodyPart, issue_type: context.issueType })}>{formatSlotButton(slot)}</button>)}</div></article>)}
             {booking.isError ? <div className="alert-box error"><p>{booking.error.message}</p></div> : null}
           </>}
         </section>
@@ -77,4 +77,15 @@ export function SimulatorPage() {
       {appointment ? <AppointmentSummary appointment={appointment} /> : null}
     </>
   );
+}
+
+function formatSlotButton(slot: RoutingResponse['ranked_recommendations'][number]['available_slots'][number]) {
+  if (slot.display_datetime) return slot.display_datetime;
+  return new Date(slot.starts_at).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Los_Angeles',
+  });
 }

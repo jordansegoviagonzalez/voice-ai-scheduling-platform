@@ -18,8 +18,10 @@ class DoctorSeed(TypedDict):
 
 LOCATIONS: list[LocationSeed] = [
     {"code": "MAIN", "name": "Main Campus"},
+    {"code": "EAST", "name": "East Clinic"},
     {"code": "NORTH", "name": "North Clinic"},
     {"code": "WEST", "name": "Westside Office"},
+    {"code": "SOUTH", "name": "South Clinic"},
 ]
 
 DOCTORS: list[DoctorSeed] = [
@@ -35,7 +37,12 @@ DOCTORS: list[DoctorSeed] = [
         "last_name": "Walsh",
         "accepts_new_patients": True,
         "locations": ["NORTH"],
-        "capabilities": [("Knee", "Fracture"), ("Knee", "Sports Medicine"), ("Foot/Ankle", "Fracture")],
+        "capabilities": [
+            ("Knee", "Fracture"),
+            ("Knee", "Sports Medicine"),
+            ("Foot/Ankle", "Fracture"),
+            ("Foot/Ankle", "General"),
+        ],
     },
     {
         "first_name": "Aisha",
@@ -66,8 +73,8 @@ DOCTORS: list[DoctorSeed] = [
         "first_name": "David",
         "last_name": "Nguyen",
         "accepts_new_patients": True,
-        "locations": ["NORTH"],
-        "capabilities": [("Foot/Ankle", "Fracture"), ("Hand/Wrist", "General")],
+        "locations": ["MAIN", "EAST", "NORTH", "WEST", "SOUTH"],
+        "capabilities": [("Foot/Ankle", "Fracture"), ("Foot/Ankle", "General"), ("Hand/Wrist", "General")],
     },
     {
         "first_name": "Sarah",
@@ -120,6 +127,6 @@ DOCTORS: list[DoctorSeed] = [
         "last_name": "Mendez",
         "accepts_new_patients": True,
         "locations": ["NORTH"],
-        "capabilities": [("Foot/Ankle", "Joint Replacement"), ("Spine", "General")],
+        "capabilities": [("Foot/Ankle", "Joint Replacement"), ("Foot/Ankle", "General"), ("Spine", "General")],
     },
 ]

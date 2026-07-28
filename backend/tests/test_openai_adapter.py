@@ -66,8 +66,8 @@ def test_openai_adapter_validates_structured_intent() -> None:
 
 def test_openai_adapter_rejects_invalid_enums_and_hallucinated_roster_items() -> None:
     with pytest.raises(OpenAIIntegrationError, match="Body part"):
-        _adapter(_payload(body_part="Elbow")).extract(
-            raw_user_text="elbow pain",
+        _adapter(_payload(body_part="Ribs")).extract(
+            raw_user_text="rib pain",
             known_doctor_names=DOCTORS,
             known_location_codes=LOCATIONS,
         )
@@ -83,6 +83,37 @@ def test_openai_adapter_rejects_invalid_enums_and_hallucinated_roster_items() ->
             known_doctor_names=DOCTORS,
             known_location_codes=LOCATIONS,
         )
+
+
+def test_openai_adapter_accepts_five_location_roster() -> None:
+    intent = _adapter(_payload(preferred_location_code="SOUTH")).extract(
+        raw_user_text="south clinic",
+        known_doctor_names=DOCTORS,
+        known_location_codes={"MAIN", "EAST", "NORTH", "WEST", "SOUTH"},
+    )
+
+    assert intent.preferred_location_code == "SOUTH"
+
+
+def test_deterministic_intent_provider_maps_ankle_and_main_location() -> None:
+    adapter = OpenAIIntentAdapter(
+        api_key=None,
+        model="gpt-5.2",
+        integration_mode="test",
+        timeout_seconds=1,
+        max_retries=0,
+    )
+
+    intent = adapter.extract(
+        raw_user_text="I am a new patient with ankle pain and prefer Main Clinic.",
+        known_doctor_names=DOCTORS,
+        known_location_codes={"MAIN", "EAST", "NORTH", "WEST", "SOUTH"},
+    )
+
+    assert intent.patient_status == "NEW"
+    assert intent.body_part == "Foot/Ankle"
+    assert intent.issue_type == "General"
+    assert intent.preferred_location_code == "MAIN"
 
 
 def test_openai_live_mode_fails_closed_without_key_and_without_model_substitution() -> None:

@@ -8,6 +8,7 @@ import { MetricCard } from '../components/MetricCard';
 import { PageHeader } from '../components/PageHeader';
 import { ErrorState, LoadingState } from '../components/States';
 import { StatusBadge } from '../components/StatusBadge';
+import type { Call, IntegrationStatus, WebChatSession } from '../types/api';
 
 const chartColors = ['#16a34a', '#f59e0b', '#dc2626', '#2563eb', '#0ea5e9'];
 
@@ -21,8 +22,8 @@ export function OverviewPage() {
   const query = useQuery({ queryKey: ['overview'], queryFn: schedulingApi.overview });
   if (query.isLoading) return <LoadingState label="Loading operations dashboard" />;
   if (query.isError || !query.data) return <ErrorState message={query.error?.message ?? 'Unknown error'} />;
-  const { metrics, outcomes, recent_calls: calls, upcoming_appointments: appointments, routing_exceptions: exceptions, integration_statuses: statuses } = query.data;
-  const coreOperational = statuses.filter((item) => ['flask_api', 'postgresql', 'routing', 'transcripts'].includes(item.id)).every((item) => item.state === 'operational');
+  const { metrics, outcomes, recent_calls: calls, recent_web_chats: webChats, upcoming_appointments: appointments, routing_exceptions: exceptions, integration_statuses: statuses } = query.data;
+  const coreOperational = statuses.filter((item: IntegrationStatus) => ['flask_api', 'postgresql', 'routing', 'transcripts'].includes(item.id)).every((item: IntegrationStatus) => item.state === 'operational');
 
   return (
     <>
@@ -59,13 +60,19 @@ export function OverviewPage() {
         <article className="panel">
           <div className="panel-head"><div><h2>Recent calls</h2><p>Latest scheduling activity</p></div><Link to="/calls">View all</Link></div>
           <DataTable label="Recent calls" headers={['Time', 'Patient', 'Request', 'Status']}>
-            {calls.map((call) => <tr key={call.id}><td>{new Date(call.started_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td><td><Link to={`/calls/${call.id}`}>{call.patient?.full_name ?? call.caller_phone}</Link></td><td>{call.requested_body_part ?? 'Not captured'} · {call.requested_issue_type ?? 'Pending'}</td><td><StatusBadge status={call.status} /></td></tr>)}
+            {calls.map((call: Call) => <tr key={call.id}><td>{new Date(call.started_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}</td><td><Link to={`/calls/${call.id}`}>{call.patient?.full_name ?? call.caller_phone}</Link></td><td>{call.requested_body_part ?? 'Not captured'} · {call.requested_issue_type ?? 'Pending'}</td><td><StatusBadge status={call.status} /></td></tr>)}
           </DataTable>
         </article>
         <article className="panel">
+          <div className="panel-head"><div><h2>Recent web chats</h2><p>Latest self-service sessions</p></div><Link to="/web-chat-sessions">View all</Link></div>
+          <DataTable label="Recent web chats" headers={['Time', 'Patient', 'Status']}>
+            {webChats?.map((session: WebChatSession) => <tr key={session.id}><td>{new Date(session.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}</td><td><Link to={`/web-chat-sessions/${session.id}`}>{session.patient?.full_name ?? 'Unidentified'}</Link></td><td><StatusBadge status={session.status} /></td></tr>)}
+          </DataTable>
+        </article>
+        <article className="panel" style={{ gridColumn: '1 / -1' }}>
           <div className="panel-head"><div><h2>Upcoming appointments</h2><p>Confirmed patient visits</p></div><Link to="/appointments">View all</Link></div>
           <DataTable label="Upcoming appointments" headers={['Time', 'Patient', 'Physician', 'Location']}>
-            {appointments.map((appointment) => <tr key={appointment.id}><td>{new Date(appointment.slot.starts_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td><td>{appointment.patient.full_name}</td><td>{appointment.doctor.full_name}</td><td>{appointment.location.name}</td></tr>)}
+            {appointments.map((appointment) => <tr key={appointment.id}><td>{formatSlotDateTime(appointment.slot)}</td><td>{appointment.patient.full_name}</td><td>{appointment.doctor.full_name}</td><td>{appointment.location.name}</td></tr>)}
           </DataTable>
         </article>
       </section>
@@ -76,4 +83,15 @@ export function OverviewPage() {
       </section>
     </>
   );
+}
+
+function formatSlotDateTime(slot: { starts_at: string; display_datetime?: string }) {
+  if (slot.display_datetime) return slot.display_datetime;
+  return new Date(slot.starts_at).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Los_Angeles',
+  });
 }

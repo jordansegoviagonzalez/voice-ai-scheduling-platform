@@ -1,0 +1,10 @@
+class ChatState:
+    ACTIVE = "active"
+    PATIENT_ACCESS = "patient_access"
+    COLLECTING_INTAKE = "collecting_intake"
+    ROUTING = "routing"
+    SELECTING_APPOINTMENT = "selecting_appointment"
+    CONFIRMED = "confirmed"
+    ESCALATED = "escalated"
+    CARE_TEAM_HANDOFF = "care_team_handoff"
+    ABANDONED = "abandoned"

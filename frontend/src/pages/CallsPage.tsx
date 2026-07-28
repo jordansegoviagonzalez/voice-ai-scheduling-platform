@@ -30,9 +30,20 @@ export function CallsPage() {
       </section>
       <section className="panel">
         {calls.length === 0 ? <EmptyState title="No calls match these filters" detail="Change the search or status filter to view additional records." /> : <DataTable label="Call review records" headers={['Date / time', 'Caller or patient', 'Patient', 'Request', 'Status', 'Physician', 'Location', 'Appointment']}>
-          {calls.map((call) => <tr key={call.id}><td>{new Date(call.started_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</td><td><Link to={`/calls/${call.id}`}>{call.patient?.full_name ?? call.caller_phone}</Link></td><td>{call.patient_status?.toLowerCase() ?? 'Unknown'}</td><td>{call.requested_body_part ?? '—'}<small className="cell-subtitle">{call.requested_issue_type ?? 'Not captured'}</small></td><td><StatusBadge status={call.status} /></td><td>{call.appointment?.doctor.full_name ?? '—'}</td><td>{call.appointment?.location.name ?? call.preferred_location?.name ?? '—'}</td><td>{call.appointment ? new Date(call.appointment.slot.starts_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</td></tr>)}
+          {calls.map((call) => <tr key={call.id}><td>{new Date(call.started_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Los_Angeles' })}</td><td><Link to={`/calls/${call.id}`}>{call.patient?.full_name ?? call.caller_phone}</Link></td><td>{call.patient_status?.toLowerCase() ?? 'Unknown'}</td><td>{call.requested_body_part ?? '—'}<small className="cell-subtitle">{call.requested_issue_type ?? 'Not captured'}</small></td><td><StatusBadge status={call.status} /></td><td>{call.appointment?.doctor.full_name ?? '—'}</td><td>{call.appointment?.location.name ?? call.preferred_location?.name ?? '—'}</td><td>{call.appointment ? formatSlotDateTime(call.appointment.slot) : '—'}</td></tr>)}
         </DataTable>}
       </section>
     </>
   );
+}
+
+function formatSlotDateTime(slot: { starts_at: string; display_datetime?: string }) {
+  if (slot.display_datetime) return slot.display_datetime;
+  return new Date(slot.starts_at).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Los_Angeles',
+  });
 }

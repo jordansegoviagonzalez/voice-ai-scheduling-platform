@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.chat import ChatMessage, ChatSession, ChatSessionEvent
 from app.models.entities import (
     ApiRateLimitBucket,
     Appointment,
@@ -24,6 +25,9 @@ __all__ = [
     "Base",
     "BookingConfirmation",
     "Call",
+    "ChatMessage",
+    "ChatSession",
+    "ChatSessionEvent",
     "Doctor",
     "DoctorCapability",
     "DoctorLocation",

@@ -5,8 +5,12 @@ import {
   LayoutDashboard,
   Route,
   Stethoscope,
+  MessageSquare,
+  Users,
+  LogOut
 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const navigation = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -15,9 +19,27 @@ const navigation = [
   { to: '/physicians', label: 'Physicians', icon: Stethoscope },
   { to: '/routing-audit', label: 'Routing Audit', icon: Route },
   { to: '/simulator', label: 'Call Simulator', icon: Activity },
+  { to: '/web-chat-sessions', label: 'Web Chat Sessions', icon: MessageSquare },
+  { to: '/patients', label: 'Patients', icon: Users },
 ];
 
 export function AppLayout() {
+  const { user, logout } = useAuth();
+
+  // Extract initials if name exists
+  const getInitials = (name: string) => {
+    return name
+      .replace(/^Dr\.\s+/i, '')
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  const initials = user?.name ? getInitials(user.name) : 'A';
+  const roleDisplay = user?.role === 'admin_provider' ? 'Administrator' : user?.role || 'Administrator';
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -37,9 +59,31 @@ export function AppLayout() {
           <span className="status-dot" />
           <div><strong>Core services online</strong><small>API · Routing · Database</small></div>
         </div>
-        <div className="sidebar-user">
-          <div className="avatar">JW</div>
-          <div><strong>Dr. James Walsh</strong><small>Administrator</small></div>
+        <div className="sidebar-user" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="avatar">{initials}</div>
+            <div><strong>{user?.name || 'Admin'}</strong><small>{roleDisplay}</small></div>
+          </div>
+          <button
+            onClick={logout}
+            title="Log out"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#6b7280',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'background-color 0.2s, color 0.2s'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6'; e.currentTarget.style.color = '#374151'; }}
+            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6b7280'; }}
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       </aside>
       <main className="main-workspace"><Outlet /></main>

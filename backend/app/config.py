@@ -33,6 +33,10 @@ class Config:
     rate_limit_enabled: bool
     rate_limit_window_seconds: int
     rate_limit_max_requests: int
+    session_idle_timeout_minutes: int
+    admin_email: str
+    admin_password: str
+    admin_name: str
 
     @classmethod
     def from_env(cls) -> Config:
@@ -70,6 +74,10 @@ class Config:
             rate_limit_enabled=_bool_env("RATE_LIMIT_ENABLED", default=app_env != "test"),
             rate_limit_window_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
             rate_limit_max_requests=int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "60")),
+            session_idle_timeout_minutes=int(os.getenv("SESSION_IDLE_TIMEOUT_MINUTES", "60")),
+            admin_email=os.getenv("ADMIN_EMAIL", "admin@example.com"),
+            admin_password=os.getenv("ADMIN_PASSWORD", "admin123"),
+            admin_name=os.getenv("ADMIN_NAME", "Dr. James Walsh"),
         )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import click
 from flask import Flask
@@ -22,6 +23,19 @@ from app.models import (
 )
 from app.models.entities import DoctorLocation
 from app.seed.data import DOCTORS, LOCATIONS
+from app.services.patient_account_security import hash_patient_password, verify_patient_password
+
+JORDAN_DEMO_EMAIL = "jordan.patient@example.com"
+JORDAN_DEMO_PASSWORD = "demo123"
+GENERAL_ORTHOPEDICS_LAST_NAME = "Nguyen"
+CLINIC_TIMEZONE = ZoneInfo("America/Los_Angeles")
+GENERAL_ROTATION_BY_WEEKDAY = {
+    0: "MAIN",
+    1: "EAST",
+    2: "NORTH",
+    3: "WEST",
+    4: "SOUTH",
+}
 
 
 def register_seed_command(app: Flask) -> None:
@@ -119,10 +133,17 @@ def seed_database(session: Session) -> None:
         ("Emily", "Davis", date(1985, 1, 18), "+18055550103", "emily@example.test"),
         ("David", "Wilson", date(1968, 7, 30), "+18055550104", None),
         ("Maya", "Patel", date(1982, 11, 6), "+18055550105", "maya@example.test"),
+        ("Jordan", "Segovia", date(1988, 9, 22), "+18052644217", JORDAN_DEMO_EMAIL),
     ]
     patient_by_phone: dict[str, Patient] = {}
     for first, last, dob, phone, email in patients:
         patient = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
+        if patient is None and email:
+            patient = session.scalar(select(Patient).where(Patient.email == email, Patient.date_of_birth == dob))
+        if patient is None and email == JORDAN_DEMO_EMAIL:
+            patient = session.scalar(
+                select(Patient).where(Patient.phone == "805-264-4217", Patient.date_of_birth == dob)
+            )
         if patient is None:
             patient = Patient(
                 first_name=first,
@@ -130,9 +151,18 @@ def seed_database(session: Session) -> None:
                 date_of_birth=dob,
                 phone=phone,
                 email=email,
+                password_hash=hash_patient_password(JORDAN_DEMO_PASSWORD) if email == JORDAN_DEMO_EMAIL else None,
+                insurance_provider=None,
             )
             session.add(patient)
             session.flush()
+        else:
+            patient.first_name = first
+            patient.last_name = last
+            patient.phone = phone
+            patient.email = email
+        if email == JORDAN_DEMO_EMAIL and not verify_patient_password(patient.password_hash, JORDAN_DEMO_PASSWORD):
+            patient.password_hash = hash_patient_password(JORDAN_DEMO_PASSWORD)
         patient_by_phone[phone] = patient
 
     maya = patient_by_phone["+18055550105"]
@@ -155,17 +185,27 @@ def seed_database(session: Session) -> None:
             )
         )
 
-    today = datetime.now(UTC).date()
+    now = datetime.now(UTC)
+    local_today = now.astimezone(CLINIC_TIMEZONE).date()
+    fallback_no_slot_date = _first_future_weekday(local_today)
+    specialist_desired_keys: set[tuple[int, int, datetime]] = set()
+    specialist_doctor_ids: set[int] = set()
     for doctor_data in DOCTORS:
+        if doctor_data["last_name"] == GENERAL_ORTHOPEDICS_LAST_NAME:
+            continue
         doctor = doctor_by_last_name[doctor_data["last_name"]]
+        specialist_doctor_ids.add(doctor.id)
         for day_offset in range(1, 15):
-            day = today + timedelta(days=day_offset)
-            if day.weekday() >= 5:
+            local_day = local_today + timedelta(days=day_offset)
+            if local_day.weekday() >= 5:
                 continue
             for location_code in doctor_data["locations"]:
                 location = location_by_code[location_code]
                 for hour in (9, 11, 14, 16):
-                    starts_at = datetime.combine(day, time(hour=hour), tzinfo=UTC)
+                    local_start = datetime.combine(local_day, time(hour=hour), tzinfo=CLINIC_TIMEZONE)
+                    starts_at = local_start.astimezone(UTC)
+                    ends_at = (local_start + timedelta(minutes=45)).astimezone(UTC)
+                    specialist_desired_keys.add(_slot_identity_key(doctor.id, location.id, starts_at))
                     slot = session.scalar(
                         select(Slot).where(
                             Slot.doctor_id == doctor.id,
@@ -178,13 +218,30 @@ def seed_database(session: Session) -> None:
                             doctor_id=doctor.id,
                             location_id=location.id,
                             starts_at=starts_at,
-                            ends_at=starts_at + timedelta(minutes=45),
+                            ends_at=ends_at,
                             status="OPEN",
                         )
                         session.add(slot)
-                    # Scenario G/H: Walsh is clinically eligible but has no open slots.
-                    if doctor.last_name == "Walsh":
+                        session.flush()
+                    else:
+                        slot.ends_at = ends_at
+                    if session.scalar(select(Appointment.id).where(Appointment.slot_id == slot.id)) is None:
+                        slot.status = "OPEN"
+                    # Fallback fixture: Dr. Chen is valid for knee sports medicine but
+                    # has no opening on the first future weekday date-range test.
+                    if doctor.last_name == "Chen" and local_day == fallback_no_slot_date:
                         slot.status = "BOOKED"
+    _close_stale_unbooked_future_slots(
+        session,
+        doctor_ids=specialist_doctor_ids,
+        desired_keys=specialist_desired_keys,
+        starts_after=now,
+    )
+    _seed_general_orthopedics_rotation(
+        session,
+        doctor=doctor_by_last_name[GENERAL_ORTHOPEDICS_LAST_NAME],
+        location_by_code=location_by_code,
+    )
     session.flush()
 
     # Idempotently create one scheduled appointment and four representative calls.
@@ -327,3 +384,90 @@ def seed_database(session: Session) -> None:
                     redirect_summary=reason if status == "REDIRECTED" else None,
                 )
             )
+
+
+def _first_future_weekday(today: date) -> date:
+    for day_offset in range(1, 15):
+        day = today + timedelta(days=day_offset)
+        if day.weekday() < 5:
+            return day
+    return today + timedelta(days=1)
+
+
+def _seed_general_orthopedics_rotation(
+    session: Session,
+    *,
+    doctor: Doctor,
+    location_by_code: dict[str, Location],
+) -> None:
+    now = datetime.now(UTC)
+    local_today = now.astimezone(CLINIC_TIMEZONE).date()
+    desired_keys: set[tuple[int, int, datetime]] = set()
+    for day_offset in range(1, 36):
+        local_day = local_today + timedelta(days=day_offset)
+        location_code = GENERAL_ROTATION_BY_WEEKDAY.get(local_day.weekday())
+        if location_code is None:
+            continue
+        location = location_by_code[location_code]
+        for hour in (9, 11, 14, 16):
+            local_start = datetime.combine(local_day, time(hour=hour), tzinfo=CLINIC_TIMEZONE)
+            starts_at = local_start.astimezone(UTC)
+            ends_at = (local_start + timedelta(minutes=45)).astimezone(UTC)
+            desired_keys.add(_slot_identity_key(doctor.id, location.id, starts_at))
+            slot = session.scalar(
+                select(Slot).where(
+                    Slot.doctor_id == doctor.id,
+                    Slot.location_id == location.id,
+                    Slot.starts_at == starts_at,
+                )
+            )
+            if slot is None:
+                slot = Slot(
+                    doctor_id=doctor.id,
+                    location_id=location.id,
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                    status="OPEN",
+                )
+                session.add(slot)
+                session.flush()
+            else:
+                slot.ends_at = ends_at
+            if session.scalar(select(Appointment.id).where(Appointment.slot_id == slot.id)) is None:
+                slot.status = "OPEN"
+
+    _close_stale_unbooked_future_slots(
+        session,
+        doctor_ids={doctor.id},
+        desired_keys=desired_keys,
+        starts_after=now,
+    )
+
+
+def _close_stale_unbooked_future_slots(
+    session: Session,
+    *,
+    doctor_ids: set[int],
+    desired_keys: set[tuple[int, int, datetime]],
+    starts_after: datetime,
+) -> None:
+    if not doctor_ids:
+        return
+    existing_future_slots = session.scalars(
+        select(Slot).where(
+            Slot.doctor_id.in_(doctor_ids),
+            Slot.starts_at >= starts_after,
+        )
+    ).all()
+    for slot in existing_future_slots:
+        key = _slot_identity_key(slot.doctor_id, slot.location_id, slot.starts_at)
+        if key in desired_keys:
+            continue
+        if session.scalar(select(Appointment.id).where(Appointment.slot_id == slot.id)) is None:
+            slot.status = "CLOSED"
+
+
+def _slot_identity_key(doctor_id: int, location_id: int, starts_at: datetime) -> tuple[int, int, datetime]:
+    if starts_at.tzinfo is not None:
+        starts_at = starts_at.astimezone(UTC).replace(tzinfo=None)
+    return doctor_id, location_id, starts_at

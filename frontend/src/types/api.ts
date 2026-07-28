@@ -16,6 +16,8 @@ export interface Doctor {
   first_name: string;
   last_name: string;
   full_name: string;
+  primary_specialty: string;
+  is_general_orthopedics: boolean;
   accepts_new_patients: boolean;
   active: boolean;
   locations: Location[];
@@ -36,6 +38,11 @@ export interface Slot {
   id: number;
   starts_at: string;
   ends_at: string;
+  time_zone?: string;
+  display_date?: string;
+  display_time?: string;
+  display_datetime?: string;
+  display_end_time?: string;
   status: string;
   location: Location;
 }
@@ -51,6 +58,7 @@ export interface Appointment {
   status: string;
   booking_source: string;
   call_id: number | null;
+  chat_session_id: number | null;
   created_at: string;
 }
 
@@ -114,6 +122,15 @@ export interface Call {
   routing_decisions?: RoutingDecision[];
 }
 
+export interface WebChatSession {
+  id: number;
+  status: string;
+  created_at: string;
+  patient: Patient | null;
+  appointment: Appointment | null;
+  escalation: { type: string; reason: string } | null;
+}
+
 export interface OverviewResponse {
   metrics: {
     total_calls: number;
@@ -126,6 +143,7 @@ export interface OverviewResponse {
   };
   outcomes: { status: CallStatus; count: number }[];
   recent_calls: Call[];
+  recent_web_chats: WebChatSession[];
   upcoming_appointments: Appointment[];
   routing_exceptions: RoutingDecision[];
   integration_statuses: IntegrationStatus[];
@@ -148,6 +166,12 @@ export interface RoutingDoctorResult {
   is_preferred_doctor: boolean;
   preferred_location_match: boolean | null;
   has_patient_history?: boolean;
+  is_general_orthopedics?: boolean;
+  primary_specialty?: string;
+  eligibility_kind?: string;
+  specialty_tier?: number;
+  location_fallback?: boolean;
+  routing_stage?: string;
 }
 
 export interface RoutingResponse {

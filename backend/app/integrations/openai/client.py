@@ -51,10 +51,10 @@ class DeterministicTestProvider:
         return {
             "raw_user_text": raw_user_text,
             "patient_status": "RETURNING" if "returning" in lowered else "NEW" if "new" in lowered else "UNKNOWN",
-            "body_part": _match(lowered, ["Knee", "Hip", "Shoulder", "Hand/Wrist", "Foot/Ankle", "Spine"]),
+            "body_part": _match_body_part(lowered),
             "issue_type": _match(lowered, ["Fracture", "Joint Replacement", "Sports Medicine", "General"]),
             "preferred_doctor_name": None,
-            "preferred_location_code": None,
+            "preferred_location_code": _match_location(lowered),
             "clarification_required": False,
             "clarification_question": None,
             "caller_correction": None,
@@ -214,4 +214,38 @@ def _match(value: str, options: list[str]) -> str | None:
         return "Fracture"
     if "pain" in value:
         return "General"
+    return None
+
+
+def _match_body_part(value: str) -> str | None:
+    body_aliases = {
+        "Knee": ("knee", "kneecap"),
+        "Hip": ("hip",),
+        "Shoulder": ("shoulder",),
+        "Upper Arm": ("upper arm",),
+        "Elbow": ("elbow",),
+        "Forearm": ("forearm",),
+        "Hand/Wrist": ("hand", "wrist", "hand/wrist", "hand and wrist"),
+        "Upper Leg": ("upper leg", "thigh"),
+        "Lower Leg": ("lower leg", "shin", "calf"),
+        "Foot/Ankle": ("foot", "ankle", "foot/ankle", "foot and ankle"),
+        "Spine": ("spine", "back", "neck"),
+    }
+    for canonical, aliases in body_aliases.items():
+        if any(alias in value for alias in aliases):
+            return canonical
+    return None
+
+
+def _match_location(value: str) -> str | None:
+    if "east" in value:
+        return "EAST"
+    if "north" in value:
+        return "NORTH"
+    if "main" in value:
+        return "MAIN"
+    if "west" in value or "westside" in value:
+        return "WEST"
+    if "south" in value:
+        return "SOUTH"
     return None

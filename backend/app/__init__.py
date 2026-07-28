@@ -42,16 +42,35 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
         RATE_LIMIT_ENABLED=settings.rate_limit_enabled,
         RATE_LIMIT_WINDOW_SECONDS=settings.rate_limit_window_seconds,
         RATE_LIMIT_MAX_REQUESTS=settings.rate_limit_max_requests,
+        SESSION_IDLE_TIMEOUT_MINUTES=settings.session_idle_timeout_minutes,
         JSON_SORT_KEYS=False,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=(settings.app_env == "production"),
+        ADMIN_EMAIL=settings.admin_email,
+        ADMIN_PASSWORD=settings.admin_password,
+        ADMIN_NAME=settings.admin_name,
     )
     if test_config:
         app.config.update(test_config)
 
-    CORS(app, origins=[app.config["FRONTEND_ORIGIN"]], supports_credentials=False)
+    CORS(app, origins=[app.config["FRONTEND_ORIGIN"]], supports_credentials=True)
     init_database(app)
     register_error_handlers(app)
     register_seed_command(app)
     app.register_blueprint(api_blueprint, url_prefix="/api/v1")
+
+    from app.routes.chat import chat_bp
+
+    app.register_blueprint(chat_bp)
+
+    from app.routes.auth import auth_bp
+
+    app.register_blueprint(auth_bp)
+
+    from app.routes.patient_account import patient_account_bp
+
+    app.register_blueprint(patient_account_bp)
 
     @app.before_request
     def assign_request_id() -> None:

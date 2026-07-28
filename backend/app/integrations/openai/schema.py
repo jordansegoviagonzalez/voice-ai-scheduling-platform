@@ -8,7 +8,7 @@ from app.domain.normalization import BODY_PARTS, ISSUE_TYPES, normalize_body_par
 from app.integrations.openai.errors import OpenAIIntegrationError
 
 PATIENT_STATUSES = {"NEW", "RETURNING", "UNKNOWN"}
-DEFAULT_LOCATION_CODES = {"MAIN", "NORTH", "WEST"}
+DEFAULT_LOCATION_CODES = {"MAIN", "EAST", "NORTH", "WEST", "SOUTH"}
 INTENT_FIELDS = {
     "raw_user_text",
     "patient_status",

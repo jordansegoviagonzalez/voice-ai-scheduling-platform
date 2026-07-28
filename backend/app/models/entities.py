@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.models.chat import ChatSession
 
 from sqlalchemy import (
     JSON,
@@ -22,7 +25,10 @@ from app.models.base import Base, TimestampMixin
 
 class Patient(Base, TimestampMixin):
     __tablename__ = "patients"
-    __table_args__ = (UniqueConstraint("phone", "date_of_birth", name="uq_patient_identity"),)
+    __table_args__ = (
+        UniqueConstraint("phone", "date_of_birth", name="uq_patient_identity"),
+        Index("ix_patients_email_unique", "email", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -30,6 +36,8 @@ class Patient(Base, TimestampMixin):
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
     phone: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     email: Mapped[str | None] = mapped_column(String(255))
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    insurance_provider: Mapped[str | None] = mapped_column(String(255))
 
     appointments: Mapped[list[Appointment]] = relationship(back_populates="patient")
     doctor_history: Mapped[list[PatientDoctorHistory]] = relationship(back_populates="patient")
@@ -139,6 +147,7 @@ class Appointment(Base, TimestampMixin):
     doctor: Mapped[Doctor] = relationship()
     location: Mapped[Location] = relationship()
     slot: Mapped[Slot] = relationship(back_populates="appointment")
+    chat_session: Mapped[ChatSession] = relationship("ChatSession", back_populates="appointment", uselist=False)
 
 
 class BookingConfirmation(Base, TimestampMixin):
@@ -150,7 +159,7 @@ class BookingConfirmation(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     confirmation_token: Mapped[str] = mapped_column(String(64), nullable=False)
-    call_id: Mapped[int] = mapped_column(ForeignKey("calls.id", ondelete="RESTRICT"), nullable=False)
+    call_id: Mapped[int | None] = mapped_column(ForeignKey("calls.id", ondelete="RESTRICT"))
     patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False)
     slot_id: Mapped[int] = mapped_column(ForeignKey("slots.id", ondelete="RESTRICT"), nullable=False)
     doctor_id: Mapped[int] = mapped_column(ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False)
@@ -166,7 +175,7 @@ class BookingConfirmation(Base, TimestampMixin):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     appointment_id: Mapped[int | None] = mapped_column(ForeignKey("appointments.id", ondelete="SET NULL"))
 
-    call: Mapped[Call] = relationship(foreign_keys=[call_id])
+    call: Mapped[Call | None] = relationship(foreign_keys=[call_id])
     patient: Mapped[Patient] = relationship()
     slot: Mapped[Slot] = relationship()
     doctor: Mapped[Doctor] = relationship()

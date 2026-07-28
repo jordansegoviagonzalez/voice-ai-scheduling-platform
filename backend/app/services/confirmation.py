@@ -21,7 +21,7 @@ class BookingConfirmationService:
     def confirm(
         self,
         *,
-        call_id: int,
+        call_id: int | None,
         patient_id: int,
         slot_id: int,
         body_part: str,
@@ -29,16 +29,17 @@ class BookingConfirmationService:
         source: str,
     ) -> BookingConfirmation:
         try:
-            call = self.session.get(Call, call_id)
-            if call is None:
-                raise ApiError("CALL_NOT_FOUND", "Call was not found.", 404)
-            if call.status in {"SCHEDULED", "FAILED", "ABANDONED"}:
-                raise ApiError("CALL_NOT_ACTIVE", "This call is no longer active for booking confirmation.", 409)
+            call = self.session.get(Call, call_id) if call_id is not None else None
+            if call_id is not None:
+                if call is None:
+                    raise ApiError("CALL_NOT_FOUND", "Call was not found.", 404)
+                if call.status in {"SCHEDULED", "FAILED", "ABANDONED"}:
+                    raise ApiError("CALL_NOT_ACTIVE", "This call is no longer active for booking confirmation.", 409)
 
             patient = self.session.get(Patient, patient_id)
             if patient is None:
                 raise ApiError("PATIENT_NOT_FOUND", "Patient was not found.", 404)
-            if call.patient_id not in (None, patient_id):
+            if call is not None and call.patient_id not in (None, patient_id):
                 raise ApiError("CALL_PATIENT_MISMATCH", "The selected patient does not match the active call.", 409)
 
             slot = self._open_slot(slot_id)
@@ -70,12 +71,13 @@ class BookingConfirmationService:
                 expires_at=now + timedelta(minutes=CONFIRMATION_TTL_MINUTES),
             )
             self.session.add(confirmation)
-            call.patient_id = patient_id
-            call.patient_status = self._patient_status(patient_id, slot.doctor_id)
-            call.requested_body_part = normalized_body_part
-            call.requested_issue_type = normalized_issue_type
-            call.preferred_doctor_id = slot.doctor_id
-            call.preferred_location_id = slot.location_id
+            if call is not None:
+                call.patient_id = patient_id
+                call.patient_status = self._patient_status(patient_id, slot.doctor_id)
+                call.requested_body_part = normalized_body_part
+                call.requested_issue_type = normalized_issue_type
+                call.preferred_doctor_id = slot.doctor_id
+                call.preferred_location_id = slot.location_id
             self.session.commit()
             return confirmation
         except ApiError:

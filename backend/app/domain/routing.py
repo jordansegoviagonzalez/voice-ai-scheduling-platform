@@ -3,11 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, and_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.domain.locations import location_sort_key
 from app.domain.normalization import normalize_body_part, normalize_issue_type
+from app.domain.specialties import general_orthopedics_can_evaluate, is_general_orthopedics, primary_specialty
 from app.errors import ApiError
 from app.models import (
     Doctor,
@@ -17,6 +20,12 @@ from app.models import (
     RoutingDecision,
     Slot,
 )
+
+NO_SAFE_ONLINE_APPOINTMENT_MESSAGE = (
+    "We couldn't safely schedule this request online. Our care team will review it and follow up with you."
+)
+CLINIC_TIMEZONE = ZoneInfo("America/Los_Angeles")
+CLINIC_TIMEZONE_LABEL = "America/Los_Angeles"
 
 
 @dataclass(frozen=True)
@@ -82,8 +91,11 @@ class PhysicianRoutingService:
             "issue_type": issue_type,
             "preferred_doctor_id": request.preferred_doctor_id,
             "preferred_location_id": request.preferred_location_id,
+            "preferred_location": self._location_payload(preferred_location) if preferred_location else None,
             "starts_after": starts_after.isoformat(),
             "ends_before": ends_before.isoformat(),
+            "locations_searched": [],
+            "ranked_recommendations": [],
         }
 
         for doctor in doctors:
@@ -125,11 +137,25 @@ class PhysicianRoutingService:
                     slot.id,
                 ),
             )
+            preferred_location_requested = request.preferred_location_id is not None
+            specialty_tier = 1 if is_general_orthopedics(doctor) else 0
             item = {
                 "doctor": self._doctor_payload(doctor),
                 "has_patient_history": doctor.id in history_doctor_ids,
                 "is_preferred_doctor": doctor.id == request.preferred_doctor_id,
-                "preferred_location_match": bool(location_match_slots) if request.preferred_location_id else None,
+                "is_general_orthopedics": is_general_orthopedics(doctor),
+                "primary_specialty": primary_specialty(doctor),
+                "specialty_tier": specialty_tier,
+                "eligibility_kind": "GENERAL_ORTHOPEDICS_FALLBACK"
+                if is_general_orthopedics(doctor)
+                else "EXACT_SPECIALIST",
+                "preferred_location_match": bool(location_match_slots) if preferred_location_requested else None,
+                "location_fallback": bool(preferred_location_requested and not location_match_slots and ordered_slots),
+                "routing_stage": self._routing_stage(
+                    issue_type="General Orthopedics" if is_general_orthopedics(doctor) else issue_type,
+                    preferred_location_requested=preferred_location_requested,
+                    preferred_location_match=bool(location_match_slots),
+                ),
                 "available_slots": [self._slot_payload(slot) for slot in ordered_slots],
             }
             eligible.append(item)
@@ -140,7 +166,7 @@ class PhysicianRoutingService:
                     doctor.id,
                     "ACCEPTED",
                     "VALID_CANDIDATE",
-                    f"{doctor.full_name} matches the requested body part, issue type, and patient eligibility rules.",
+                    f"{doctor.full_name} matches the requested orthopedic scheduling details.",
                     context,
                 )
             )
@@ -165,17 +191,32 @@ class PhysicianRoutingService:
                     )
                 )
 
-        ranked = [item for item in eligible if item["available_slots"]]
-        ranked.sort(
+        ranked_candidates = [item for item in eligible if item["available_slots"]]
+        ranked_candidates.sort(
             key=lambda item: (
                 0 if item["is_preferred_doctor"] else 1,
+                item["specialty_tier"],
                 0 if item["preferred_location_match"] else 1,
                 item["available_slots"][0]["starts_at"],
                 item["doctor"]["id"],
             )
         )
+        ranked = self._top_three_recommendations(ranked_candidates)
 
         recommendation = ranked[0] if ranked else None
+        context["locations_searched"] = self._locations_searched(preferred_location)
+        context["ranked_recommendations"] = [self._recommendation_context(item) for item in ranked]
+        location_fallback = self._location_fallback(preferred_location, recommendation)
+        if location_fallback:
+            context["redirect"] = location_fallback
+            context["redirect_reason"] = location_fallback["reason_code"]
+            context["selected_alternative_location"] = location_fallback["selected_location"]
+        elif preferred_location:
+            context["redirect"] = None
+            context["redirect_reason"] = None
+            context["selected_alternative_location"] = None
+        for decision in decisions:
+            decision.request_context = dict(context)
         fallback_info = self._fallback_info(
             eligible=eligible,
             ranked=ranked,
@@ -191,7 +232,7 @@ class PhysicianRoutingService:
                     "ACCEPTED",
                     "FALLBACK_SELECTED",
                     fallback_info,
-                    context,
+                    dict(context),
                 )
             )
 
@@ -206,9 +247,15 @@ class PhysicianRoutingService:
             "availability_exceptions": availability_exceptions,
             "ranked_recommendations": ranked,
             "recommended": recommendation,
+            "location_fallback": location_fallback,
             "fallback_explanation": fallback_info,
             "caller_safe_summary": self._caller_summary(
-                recommendation, rejected, availability_exceptions, preferred_doctor, preferred_location
+                recommendation,
+                rejected,
+                availability_exceptions,
+                preferred_doctor,
+                preferred_location,
+                location_fallback,
             ),
         }
 
@@ -269,24 +316,71 @@ class PhysicianRoutingService:
         history_doctor_ids: set[int],
     ) -> tuple[str, str] | None:
         capabilities_for_body = [cap for cap in doctor.capabilities if cap.body_part == body_part]
+        if is_general_orthopedics(doctor) and general_orthopedics_can_evaluate(body_part, issue_type):
+            if not doctor.accepts_new_patients and doctor.id not in history_doctor_ids:
+                return (
+                    "PATIENT_HAS_NO_HISTORY_WITH_DOCTOR",
+                    f"{doctor.full_name} only schedules patients who have previously been treated by this physician.",
+                )
+            return None
         if not capabilities_for_body:
             return (
                 "BODY_PART_NOT_SUPPORTED",
-                f"{doctor.full_name} does not treat {body_part.lower()} conditions under this protocol.",
+                f"{doctor.full_name} does not treat {body_part.lower()} appointments.",
             )
         exact_match = any(cap.issue_type == issue_type for cap in capabilities_for_body)
         if not exact_match:
             accepted = ", ".join(sorted({cap.issue_type for cap in capabilities_for_body}))
             return (
                 "ISSUE_TYPE_NOT_SUPPORTED",
-                f"{doctor.full_name} treats {body_part.lower()} cases for {accepted}, but not {issue_type.lower()}.",
+                f"{doctor.full_name} treats {body_part.lower()} appointments for {accepted}, "
+                f"but not {issue_type.lower()}.",
             )
         if not doctor.accepts_new_patients and doctor.id not in history_doctor_ids:
             return (
                 "PATIENT_HAS_NO_HISTORY_WITH_DOCTOR",
-                f"{doctor.full_name} is not accepting patients who have not previously been treated by this physician.",
+                f"{doctor.full_name} only schedules patients who have previously been treated by this physician.",
             )
         return None
+
+    @staticmethod
+    def _routing_stage(
+        *,
+        issue_type: str,
+        preferred_location_requested: bool,
+        preferred_location_match: bool,
+    ) -> str:
+        issue_prefix = "general" if issue_type == "General" else "exact"
+        if issue_type == "General Orthopedics":
+            issue_prefix = "general_orthopedics"
+        if not preferred_location_requested:
+            return f"{issue_prefix}_no_location_preference"
+        if preferred_location_match:
+            return f"{issue_prefix}_preferred_location"
+        return f"{issue_prefix}_alternative_location"
+
+    @staticmethod
+    def _location_fallback(
+        preferred_location: Location | None,
+        recommendation: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not preferred_location or not recommendation or recommendation.get("preferred_location_match"):
+            return None
+        selected_slot = recommendation["available_slots"][0]
+        selected_location = selected_slot["location"]
+        selected_doctor = recommendation["doctor"]
+        return {
+            "reason_code": "PREFERRED_LOCATION_UNAVAILABLE",
+            "preferred_location": PhysicianRoutingService._location_payload(preferred_location),
+            "selected_location": selected_location,
+            "selected_doctor_id": selected_doctor["id"],
+            "selected_doctor_name": selected_doctor["full_name"],
+            "selected_slot_id": selected_slot["id"],
+            "patient_summary": (
+                f"We couldn't find a matching appointment at {preferred_location.name}, but "
+                f"eligible appointments are available at {selected_location['name']}."
+            ),
+        }
 
     def _fallback_info(
         self,
@@ -327,12 +421,14 @@ class PhysicianRoutingService:
         availability_exceptions: list[dict[str, Any]],
         preferred_doctor: Doctor | None,
         preferred_location: Location | None,
+        location_fallback: dict[str, Any] | None,
     ) -> str:
         if recommendation:
             slot = recommendation["available_slots"][0]
             intro = (
-                f"The earliest matching opening is with {recommendation['doctor']['full_name']} at "
-                f"{slot['location']['name']} on {slot['starts_at']}."
+                f"I found orthopedic physicians who can evaluate your condition. The first available option shown is "
+                f"with {recommendation['doctor']['full_name']} at {slot['location']['name']} on "
+                f"{self._slot_patient_phrase(slot)}."
             )
             if preferred_doctor:
                 rejection = next(
@@ -341,15 +437,19 @@ class PhysicianRoutingService:
                 )
                 if rejection:
                     intro = f"{rejection['reason']} {intro}"
-            if preferred_location and not recommendation["preferred_location_match"]:
+            if preferred_location and location_fallback:
                 intro = (
-                    f"There are no matching openings at {preferred_location.name}. "
-                    f"{intro} Please confirm the different location before booking."
+                    f"I found orthopedic physicians who can evaluate your condition. I listed the best available "
+                    f"options, including appointments at other clinic locations because {preferred_location.name} "
+                    "did not have a matching opening."
                 )
             return intro
         if availability_exceptions:
-            return "Matching physicians were found, but none has an open slot in the selected date range."
-        return "No physician matches the requested body part, issue type, and patient eligibility rules."
+            return (
+                "We found physicians who match your request, but no online appointments are open in the selected "
+                "date range. Our care team will review your request and follow up with you."
+            )
+        return NO_SAFE_ONLINE_APPOINTMENT_MESSAGE
 
     @staticmethod
     def _doctor_payload(doctor: Doctor) -> dict[str, Any]:
@@ -358,10 +458,12 @@ class PhysicianRoutingService:
             "first_name": doctor.first_name,
             "last_name": doctor.last_name,
             "full_name": doctor.full_name,
+            "primary_specialty": primary_specialty(doctor),
+            "is_general_orthopedics": is_general_orthopedics(doctor),
             "accepts_new_patients": doctor.accepts_new_patients,
             "locations": [
                 {"id": location.id, "code": location.code, "name": location.name}
-                for location in sorted(doctor.locations, key=lambda item: item.id)
+                for location in sorted(doctor.locations, key=location_sort_key)
             ],
             "capabilities": [
                 {"body_part": cap.body_part, "issue_type": cap.issue_type}
@@ -375,6 +477,11 @@ class PhysicianRoutingService:
             "id": slot.id,
             "starts_at": slot.starts_at.isoformat(),
             "ends_at": slot.ends_at.isoformat(),
+            "time_zone": CLINIC_TIMEZONE_LABEL,
+            "display_date": cls_date(slot.starts_at),
+            "display_time": cls_time(slot.starts_at),
+            "display_datetime": cls_datetime(slot.starts_at),
+            "display_end_time": cls_time(slot.ends_at),
             "status": slot.status,
             "doctor_id": slot.doctor_id,
             "location": {
@@ -383,6 +490,49 @@ class PhysicianRoutingService:
                 "name": slot.location.name,
             },
         }
+
+    @staticmethod
+    def _location_payload(location: Location) -> dict[str, Any]:
+        return {"id": location.id, "code": location.code, "name": location.name}
+
+    def _locations_searched(self, preferred_location: Location | None) -> list[dict[str, Any]]:
+        locations = list(self.session.scalars(select(Location)))
+        locations = sorted(
+            locations,
+            key=lambda item: (
+                0 if preferred_location and item.id == preferred_location.id else 1,
+                *location_sort_key(item),
+            ),
+        )
+        return [PhysicianRoutingService._location_payload(location) for location in locations]
+
+    @staticmethod
+    def _recommendation_context(item: dict[str, Any]) -> dict[str, Any]:
+        slot = item["available_slots"][0]
+        return {
+            "doctor_id": item["doctor"]["id"],
+            "doctor_name": item["doctor"]["full_name"],
+            "primary_specialty": item["primary_specialty"],
+            "is_general_orthopedics": item["is_general_orthopedics"],
+            "eligibility_kind": item["eligibility_kind"],
+            "location": slot["location"],
+            "slot_id": slot["id"],
+            "starts_at": slot["starts_at"],
+            "display_datetime": slot["display_datetime"],
+            "redirect_reason": "PREFERRED_LOCATION_UNAVAILABLE" if item.get("location_fallback") else None,
+        }
+
+    @staticmethod
+    def _top_three_recommendations(ranked_candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        general = [item for item in ranked_candidates if item.get("is_general_orthopedics")]
+        specialists = [item for item in ranked_candidates if not item.get("is_general_orthopedics")]
+        if not general:
+            return ranked_candidates[:3]
+        return [*specialists[:2], general[0]][:3]
+
+    @staticmethod
+    def _slot_patient_phrase(slot: dict[str, Any]) -> str:
+        return str(slot.get("display_datetime") or slot["starts_at"])
 
     @staticmethod
     def _decision(
@@ -404,3 +554,24 @@ class PhysicianRoutingService:
             request_context=context,
             created_at=datetime.now(UTC),
         )
+
+
+def cls_datetime(value: datetime) -> str:
+    local = _as_clinic_time(value)
+    return f"{local:%A}, {local:%B} {local.day} at {cls_time(value)}"
+
+
+def cls_date(value: datetime) -> str:
+    local = _as_clinic_time(value)
+    return f"{local:%b} {local.day}"
+
+
+def cls_time(value: datetime) -> str:
+    local = _as_clinic_time(value)
+    return local.strftime("%I:%M %p").lstrip("0")
+
+
+def _as_clinic_time(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(CLINIC_TIMEZONE)

@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.domain.locations import location_sort_key
 from app.errors import ApiError
 from app.extensions import get_session
 from app.models import Doctor, Location
@@ -36,19 +37,31 @@ def get_doctor(doctor_id: int):  # type: ignore[no-untyped-def]
 
 @bp.get("/locations")
 def list_locations():  # type: ignore[no-untyped-def]
-    locations = list(get_session().scalars(select(Location).order_by(Location.id)))
+    locations = sorted(get_session().scalars(select(Location)).all(), key=location_sort_key)
     return jsonify({"locations": [location_json(item) for item in locations]})
 
 
 @bp.get("/protocol")
 def get_protocol():  # type: ignore[no-untyped-def]
     doctors = list(get_session().scalars(_doctor_query()))
-    locations = list(get_session().scalars(select(Location).order_by(Location.id)))
+    locations = sorted(get_session().scalars(select(Location)).all(), key=location_sort_key)
     return jsonify(
         {
             "locations": [location_json(item) for item in locations],
             "doctors": [doctor_json(item) for item in doctors],
-            "body_parts": ["Knee", "Hip", "Shoulder", "Hand/Wrist", "Foot/Ankle", "Spine"],
+            "body_parts": [
+                "Knee",
+                "Hip",
+                "Shoulder",
+                "Upper Arm",
+                "Elbow",
+                "Forearm",
+                "Hand/Wrist",
+                "Upper Leg",
+                "Lower Leg",
+                "Foot/Ankle",
+                "Spine",
+            ],
             "issue_types": ["Fracture", "Joint Replacement", "Sports Medicine", "General"],
         }
     )
