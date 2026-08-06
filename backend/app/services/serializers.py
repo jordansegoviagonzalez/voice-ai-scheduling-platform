@@ -6,8 +6,41 @@ from zoneinfo import ZoneInfo
 
 from app.domain.locations import location_sort_key
 from app.domain.specialties import is_general_orthopedics, primary_specialty
-from app.models import Appointment, BookingConfirmation, Call, Doctor, Location, Patient, RoutingDecision, Slot
+from app.models import (
+    Appointment,
+    BookingConfirmation,
+    Call,
+    Doctor,
+    Location,
+    Organization,
+    Patient,
+    RoutingDecision,
+    Slot,
+)
 from app.models.chat import ChatSession
+
+
+def organization_json(organization: Organization) -> dict[str, Any]:
+    return {
+        "id": organization.id,
+        "slug": organization.slug,
+        "name": organization.name,
+        "status": organization.status,
+        "timezone": organization.timezone,
+        "active": organization.status == "ACTIVE",
+        "created_at": organization.created_at.isoformat(),
+        "updated_at": organization.updated_at.isoformat(),
+    }
+
+
+def public_organization_json(organization: Organization) -> dict[str, Any]:
+    return {
+        "id": organization.id,
+        "slug": organization.slug,
+        "name": organization.name,
+        "status": organization.status,
+        "timezone": organization.timezone,
+    }
 
 
 def patient_json(patient: Patient) -> dict[str, Any]:
@@ -38,12 +71,18 @@ def patient_profile_json(patient: Patient) -> dict[str, Any]:
 
 
 def location_json(location: Location) -> dict[str, Any]:
-    return {"id": location.id, "code": location.code, "name": location.name}
+    return {
+        "id": location.id,
+        "organization_id": location.organization_id,
+        "code": location.code,
+        "name": location.name,
+    }
 
 
 def doctor_json(doctor: Doctor) -> dict[str, Any]:
     return {
         "id": doctor.id,
+        "organization_id": doctor.organization_id,
         "first_name": doctor.first_name,
         "last_name": doctor.last_name,
         "full_name": doctor.full_name,

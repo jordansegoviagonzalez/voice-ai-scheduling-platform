@@ -6,6 +6,7 @@ from app.routes.confirmations import bp as confirmations_bp
 from app.routes.conversation import bp as conversation_bp
 from app.routes.dashboard import bp as dashboard_bp
 from app.routes.health import bp as health_bp
+from app.routes.organizations import bp as organizations_bp
 from app.routes.patients import bp as patients_bp
 from app.routes.protocol import bp as protocol_bp
 from app.routes.routing import bp as routing_bp
@@ -16,6 +17,7 @@ from app.routes.vogent import bp as vogent_bp
 api_blueprint = Blueprint("api", __name__)
 for blueprint in (
     health_bp,
+    organizations_bp,
     patients_bp,
     protocol_bp,
     routing_bp,

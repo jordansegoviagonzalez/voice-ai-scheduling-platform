@@ -43,6 +43,75 @@ Response `200`:
 }
 ```
 
+## Organizations
+
+Organization management endpoints require a valid admin session, except slug resolution. Slug resolution is public-safe and returns only active organizations.
+
+### `POST /organizations`
+
+Creates an organization. `name` is required. `slug`, `status`, and `timezone` are optional. When `slug` is omitted, the API generates one from `name`.
+
+```json
+{
+  "name": "Summit Orthopedics",
+  "slug": "summit-orthopedics",
+  "timezone": "America/Los_Angeles"
+}
+```
+
+Responses: `201` created, `409 ORGANIZATION_SLUG_CONFLICT` when the normalized slug already exists, `422` invalid input.
+
+### `GET /organizations`
+
+Lists organizations for the authenticated admin.
+
+### `GET /organizations/{organization_id}`
+
+Returns one organization by internal ID. Missing IDs return `404 ORGANIZATION_NOT_FOUND`.
+
+### `PATCH /organizations/{organization_id}`
+
+Updates `name`, `slug`, `status`, or `timezone`. Supported statuses are `ACTIVE` and `INACTIVE`. Updating the name does not automatically change the slug.
+
+### `GET /organizations/slug/{organization_slug}`
+
+Resolves an active organization by public slug. Unknown slugs return `404 ORGANIZATION_NOT_FOUND`; inactive organizations return `409 ORGANIZATION_INACTIVE`. Explicit slug resolution never falls back to the default organization.
+
+## Organization Doctors
+
+Organization doctor endpoints require a valid admin session and scope every lookup by `organization_id`.
+
+### `POST /organizations/{organization_id}/doctors`
+
+Creates a doctor under the selected organization.
+
+```json
+{
+  "first_name": "Iris",
+  "last_name": "Stone",
+  "accepts_new_patients": true,
+  "active": true,
+  "location_ids": [12],
+  "capabilities": [
+    {"body_part": "Knee", "issue_type": "General"}
+  ]
+}
+```
+
+`location_ids` must belong to the selected organization. Capabilities are optional and use the existing normalized body part and issue type rules.
+
+### `GET /organizations/{organization_id}/doctors`
+
+Lists only doctors owned by the selected organization.
+
+### `GET /organizations/{organization_id}/doctors/{doctor_id}`
+
+Returns one doctor only when the doctor belongs to the selected organization. A doctor from another organization returns `404 DOCTOR_NOT_FOUND`.
+
+### `PATCH /organizations/{organization_id}/doctors/{doctor_id}`
+
+Updates doctor name, new-patient eligibility, active state, locations, or capabilities within the selected organization. Cross-organization doctor access returns `404 DOCTOR_NOT_FOUND`.
+
 ## Patients
 
 ### `POST /patients/lookup`
