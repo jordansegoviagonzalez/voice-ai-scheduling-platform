@@ -24,6 +24,80 @@ The central design rule is that conversational channels collect and normalize in
 
 This application schedules medical appointments. It does not diagnose, triage, recommend treatment, generate clinical notes, verify insurance, process payments, or claim HIPAA compliance. All committed patient data is synthetic demonstration data.
 
+## Phase 2 URLs and Demo Credentials
+
+- **Admin Dashboard URL:** `http://localhost:5173/`
+- **Patient Entry URL:** `http://localhost:5173/sign-in?role=patient`
+- **Patient Web Chat URL:** `http://localhost:5173/chat` or `http://localhost:5173/schedule` after a valid patient session exists.
+
+**Demo Admin Credentials:**
+- Name: Dr. James Walsh
+- Email: `admin@example.com`
+- Password: `admin123`
+
+**Demo Returning Patient Credentials:**
+- Name: Olivia Carter
+- Email: `olivia.carter.phase2.demo@example.com`
+- Password: `Patient!2026`
+- Identity fields: DOB: 1993-06-12, Phone: 805-555-0187
+
+Olivia's weak password is synthetic demonstration data only. The seed stores it as a password hash, not plaintext.
+
+**Supported functionality:**
+- Happy paths for new and returning patient scheduling.
+- Patient-first entry with distinct New patient and Returning patient paths before chat initialization.
+- New-patient registration creates or reuses a validated synthetic patient record with normalized email and a securely hashed password before the scheduling transcript starts.
+- New-patient passwords require 12-128 characters, may include spaces, are never trimmed or stored in plaintext, and must be confirmed in the registration form.
+- Returning-patient authentication verifies the submitted email and password against the stored database hash before creating a signed browser session.
+- The same patient credentials work after sign-out, browser changes, device changes, lost cookies, and idle-session expiration.
+- Patient profile email updates become the future login identifier while preserving the existing password hash.
+- Login restores the authenticated patient's latest unfinished scheduling session when one exists.
+- Confirmed, emergency-escalated, care-team-handoff, abandoned, and other terminal chat sessions remain historical records instead of reopening as drafts.
+- Dynamic personalized welcome messages are persisted once from the backend patient record: `Welcome, {first_name}. What is the reason for your visit today?` for new patients and `Welcome back, {first_name}. What is the reason for your visit today?` for returning patients.
+- Conversational intake that stores transcript messages separately from structured intake data.
+- Patient-facing chat refinement with a backend-derived progress dropdown, accessible textarea composer, auto-scroll, thinking state, retry-safe failed sends, and concise approved intake questions.
+- OpenAI-backed structured intake through the Flask backend only, with deterministic backend validation and no browser-side OpenAI calls.
+- Deterministic physician recommendations using the Phase 1 `PhysicianRoutingService`, real database slots, and transactional booking.
+- Typo-tolerant normalization for common speech-like inputs such as `north clinc`, `east clinic`, `south clinic`, `ankle pain`, `this is a follow up yeah`, and `I being felling this way for about two weeks`, while preserving the original patient message in the transcript.
+- Severity uses a 1-10 scale only. Values outside 1-10 are rejected without silently clamping or persisting the invalid value.
+- Emergency escalation, including stopping scheduling, saving the trigger message, and marking the session as escalated.
+- Care team handoff for explicit human requests, complex insurance/payment/billing questions, unsupported complaints, and repeated low-confidence interpretation.
+- Browser refresh recovery for intake, recommendation, selected-slot, booking, and escalation states without regenerating welcome messages.
+- Direct `/chat` navigation without a valid patient session redirects to patient entry instead of creating an anonymous intake.
+- Patient account menu in the scheduling UI is backed by the authenticated server session and contains only Profile and Sign out.
+- Patient profile at `/patient/profile` shows the authenticated Patient record, uses the persisted account-created timestamp, and allows only email and phone updates.
+- Patient sign-out invalidates the server patient session, clears frontend patient/chat state, and preserves patients, transcripts, routing results, and appointments.
+- Scheduling status is an accessible disclosure: collapsed mode shows only the current status label, while expanded mode reveals backend-derived progress and confirmed appointment details.
+- Backend-enforced idle expiration uses `SESSION_IDLE_TIMEOUT_MINUTES` for patient and admin sessions and returns `SESSION_EXPIRED` after inactivity.
+- Protected admin review pages for Web Chat Sessions and Patients.
+
+**Intentionally Left Out:**
+- HIPAA compliance features.
+- Password reset, email verification, MFA, OAuth, SMS verification, and long-term account-management workflows.
+- Appointment-history interface, cancellation, rescheduling, advanced concurrent-session management, and account-wide remote logout.
+- Map distance, travel-time ranking, and "closest physician" claims.
+- Payments, digital paperwork, reviews, and reminder workflows.
+- Production-grade security hardening beyond the demo access gates and environment-based secrets.
+
+For this work trial, the patient experience now includes a minimal persistent account foundation: normalized email, hashed password, server-side signed sessions, idle expiration, logout, and owned chat-session recovery. Production features such as password reset, email verification, MFA, OAuth, advanced concurrent-session controls, and account-wide remote logout remain deferred.
+
+## Phase 2 Patient Workflow
+
+1. Patient starts at `/sign-in?role=patient` and selects New patient or Returning patient.
+2. Returning patients authenticate with stored email/password credentials before any new scheduling transcript is created.
+3. New patients complete registration with first name, last name, date of birth, contact number, email, password, password confirmation, and insurance provider before any scheduling transcript is created.
+4. The backend creates or reuses the validated synthetic patient record, links the chat session to that patient, stores `patient_type`, and persists exactly one personalized assistant welcome.
+5. Successful login restores the latest patient-owned unfinished scheduling session. If none exists, the backend creates a new patient-owned scheduling session.
+6. `/chat` and `/schedule` restore the authenticated browser's remembered session. Without one, they redirect to patient entry.
+7. The patient can open the account menu to view the profile or sign out. Profile authorization is resolved from the server session, never from a frontend-supplied patient id.
+8. The chat collects complaint, body part, side, duration, severity, appointment type, preferred location, preferred dates, preferred time of day, and preferred physician when supplied.
+9. Deterministic backend validation rejects invalid future dates of birth, invalid severity values, unsupported categories, ambiguous required answers, and unsafe requests.
+10. Once intake is complete, the backend calls the existing routing service and returns up to three eligible physicians with real open slots.
+11. The patient selects an available time, reviews appointment details, and must explicitly confirm before booking.
+12. Booking re-checks the slot and eligibility transactionally, links the appointment to the patient and chat session, and returns a confirmation only after commit.
+13. After confirmation, the status disclosure remains visible and contains the confirmation summary and completed checklist without duplicating those details elsewhere.
+14. Admin users can review the transcript, structured intake, routing path, escalation data, and appointment details in the existing dashboard.
+
 ## Architecture
 
 ```mermaid
