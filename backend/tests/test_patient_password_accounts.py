@@ -12,6 +12,7 @@ from app.domain.chat.chat_steps import ChatStep
 from app.extensions import get_session_factory
 from app.models import ChatMessage, ChatSession, Patient
 from app.seed import seed_database
+from app.services.organization_context import default_organization_id
 from app.services.patient_account_security import verify_patient_password
 
 NEW_PATIENT_PASSWORD = "correct horse battery staple"
@@ -92,7 +93,11 @@ def test_returning_patient_login_uses_generic_failure_for_wrong_or_unknown_crede
 ) -> None:
     wrong_password = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "wrong-password"},
+        json={
+            "patientMode": "returning",
+            "email": "olivia.carter.phase2.demo@example.com",
+            "password": "wrong-password",
+        },
     )
     unknown_email = client.post(
         "/api/chat/sessions",
@@ -431,6 +436,7 @@ def _create_chat_session(
     session = get_session_factory()()
     try:
         chat_session = ChatSession(
+            organization_id=default_organization_id(session),
             patient_id=patient_id,
             status=status,
             current_step=_step_for_status(status),

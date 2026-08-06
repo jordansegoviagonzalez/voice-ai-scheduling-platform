@@ -23,6 +23,24 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
 
+class Organization(Base, TimestampMixin):
+    __tablename__ = "organizations"
+    __table_args__ = (UniqueConstraint("slug", name="uq_organizations_slug"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="America/Los_Angeles")
+
+    locations: Mapped[list[Location]] = relationship(back_populates="organization")
+    doctors: Mapped[list[Doctor]] = relationship(back_populates="organization")
+    slots: Mapped[list[Slot]] = relationship(back_populates="organization")
+    appointments: Mapped[list[Appointment]] = relationship(back_populates="organization")
+    calls: Mapped[list[Call]] = relationship(back_populates="organization")
+    routing_decisions: Mapped[list[RoutingDecision]] = relationship(back_populates="organization")
+
+
 class Patient(Base, TimestampMixin):
     __tablename__ = "patients"
     __table_args__ = (
@@ -49,24 +67,36 @@ class Patient(Base, TimestampMixin):
 
 class Location(Base):
     __tablename__ = "locations"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "code", name="uq_location_org_code"),
+        UniqueConstraint("organization_id", "name", name="uq_location_org_name"),
+        Index("ix_locations_org_code", "organization_id", "code"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    code: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)
-    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
+    code: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
 
+    organization: Mapped[Organization] = relationship(back_populates="locations")
     doctors: Mapped[list[Doctor]] = relationship(secondary="doctor_locations", back_populates="locations")
 
 
 class Doctor(Base, TimestampMixin):
     __tablename__ = "doctors"
-    __table_args__ = (UniqueConstraint("first_name", "last_name", name="uq_doctor_name"),)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "first_name", "last_name", name="uq_doctor_org_name"),
+        Index("ix_doctors_org_active", "organization_id", "active"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     accepts_new_patients: Mapped[bool] = mapped_column(Boolean, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    organization: Mapped[Organization] = relationship(back_populates="doctors")
     locations: Mapped[list[Location]] = relationship(secondary="doctor_locations", back_populates="doctors")
     capabilities: Mapped[list[DoctorCapability]] = relationship(back_populates="doctor", cascade="all, delete-orphan")
 
@@ -113,17 +143,20 @@ class PatientDoctorHistory(Base, TimestampMixin):
 class Slot(Base, TimestampMixin):
     __tablename__ = "slots"
     __table_args__ = (
-        UniqueConstraint("doctor_id", "location_id", "starts_at", name="uq_slot_start"),
+        UniqueConstraint("organization_id", "doctor_id", "location_id", "starts_at", name="uq_slot_org_start"),
         Index("ix_slots_availability", "status", "starts_at"),
+        Index("ix_slots_org_availability", "organization_id", "status", "starts_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     doctor_id: Mapped[int] = mapped_column(ForeignKey("doctors.id", ondelete="CASCADE"))
     location_id: Mapped[int] = mapped_column(ForeignKey("locations.id", ondelete="CASCADE"))
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="OPEN")
 
+    organization: Mapped[Organization] = relationship(back_populates="slots")
     doctor: Mapped[Doctor] = relationship()
     location: Mapped[Location] = relationship()
     appointment: Mapped[Appointment | None] = relationship(back_populates="slot", uselist=False)
@@ -131,8 +164,10 @@ class Slot(Base, TimestampMixin):
 
 class Appointment(Base, TimestampMixin):
     __tablename__ = "appointments"
+    __table_args__ = (Index("ix_appointments_org_status", "organization_id", "status"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id", ondelete="RESTRICT"))
     doctor_id: Mapped[int] = mapped_column(ForeignKey("doctors.id", ondelete="RESTRICT"))
     location_id: Mapped[int] = mapped_column(ForeignKey("locations.id", ondelete="RESTRICT"))
@@ -143,6 +178,7 @@ class Appointment(Base, TimestampMixin):
     booking_source: Mapped[str] = mapped_column(String(32), nullable=False, default="WEB")
     call_id: Mapped[int | None] = mapped_column(Integer)
 
+    organization: Mapped[Organization] = relationship(back_populates="appointments")
     patient: Mapped[Patient] = relationship(back_populates="appointments")
     doctor: Mapped[Doctor] = relationship()
     location: Mapped[Location] = relationship()
@@ -249,8 +285,10 @@ class ApiRateLimitBucket(Base, TimestampMixin):
 
 class Call(Base, TimestampMixin):
     __tablename__ = "calls"
+    __table_args__ = (Index("ix_calls_org_started", "organization_id", "started_at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     external_call_id: Mapped[str | None] = mapped_column(String(128), unique=True)
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"))
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="IN_PROGRESS")
@@ -267,6 +305,7 @@ class Call(Base, TimestampMixin):
     failure_reason: Mapped[str | None] = mapped_column(Text)
     redirect_summary: Mapped[str | None] = mapped_column(Text)
 
+    organization: Mapped[Organization] = relationship(back_populates="calls")
     patient: Mapped[Patient | None] = relationship()
     preferred_doctor: Mapped[Doctor | None] = relationship(foreign_keys=[preferred_doctor_id])
     preferred_location: Mapped[Location | None] = relationship(foreign_keys=[preferred_location_id])
@@ -295,8 +334,10 @@ class TranscriptTurn(Base):
 
 class RoutingDecision(Base):
     __tablename__ = "routing_decisions"
+    __table_args__ = (Index("ix_routing_decisions_org_created", "organization_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     call_id: Mapped[int | None] = mapped_column(ForeignKey("calls.id", ondelete="CASCADE"))
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"))
     doctor_id: Mapped[int | None] = mapped_column(ForeignKey("doctors.id"))
@@ -306,5 +347,6 @@ class RoutingDecision(Base):
     request_context: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    organization: Mapped[Organization] = relationship(back_populates="routing_decisions")
     call: Mapped[Call | None] = relationship(back_populates="routing_decisions")
     doctor: Mapped[Doctor | None] = relationship()

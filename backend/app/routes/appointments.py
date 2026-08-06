@@ -9,6 +9,7 @@ from app.extensions import get_session
 from app.models import Appointment, Doctor
 from app.routes.common import bounded_string, int_or_none, json_body, require_fields
 from app.services.booking import BookingService
+from app.services.organization_context import default_organization_id
 from app.services.serializers import appointment_json
 
 bp = Blueprint("appointments", __name__)
@@ -46,13 +47,27 @@ def create_appointment():  # type: ignore[no-untyped-def]
 
 @bp.get("/appointments")
 def list_appointments():  # type: ignore[no-untyped-def]
-    appointments = list(get_session().scalars(_appointment_query().order_by(Appointment.created_at.desc())))
+    session = get_session()
+    organization_id = default_organization_id(session)
+    appointments = list(
+        session.scalars(
+            _appointment_query()
+            .where(Appointment.organization_id == organization_id)
+            .order_by(Appointment.created_at.desc())
+        )
+    )
     return jsonify({"appointments": [appointment_json(item) for item in appointments]})
 
 
 @bp.get("/appointments/<int:appointment_id>")
 def get_appointment(appointment_id: int):  # type: ignore[no-untyped-def]
-    appointment = get_session().scalar(_appointment_query().where(Appointment.id == appointment_id))
+    session = get_session()
+    appointment = session.scalar(
+        _appointment_query().where(
+            Appointment.id == appointment_id,
+            Appointment.organization_id == default_organization_id(session),
+        )
+    )
     if appointment is None:
         raise ApiError("APPOINTMENT_NOT_FOUND", "Appointment was not found.", 404)
     return jsonify({"appointment": appointment_json(appointment)})

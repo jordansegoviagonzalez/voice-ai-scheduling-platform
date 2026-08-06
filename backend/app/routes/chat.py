@@ -14,6 +14,7 @@ from app.services.booking import BookingService
 from app.services.chat_session_service import ChatSessionService
 from app.services.chat_workflow_service import ChatWorkflowService
 from app.services.escalation_service import EscalationService
+from app.services.organization_context import default_organization_id
 from app.services.patient_access_service import PatientAccessService
 from app.services.session_security import (
     has_patient_session,
@@ -29,6 +30,7 @@ chat_bp = Blueprint("chat", __name__, url_prefix="/api/chat")
 
 def get_services() -> tuple[ChatSessionService, ChatWorkflowService]:
     db_session = get_db_session()
+    organization_id = default_organization_id(db_session)
     chat_service = ChatSessionService(db_session)
     ai_client = OpenAIIntakeClient(
         current_app.config.get("OPENAI_API_KEY"),
@@ -37,6 +39,7 @@ def get_services() -> tuple[ChatSessionService, ChatWorkflowService]:
         max_retries=int(current_app.config.get("OPENAI_MAX_RETRIES", 2)),
     )
     workflow = ChatWorkflowService(
+        organization_id=organization_id,
         db_session=db_session,
         chat_service=chat_service,
         patient_access=PatientAccessService(db_session),
@@ -77,7 +80,7 @@ def create_access_session() -> ResponseReturnValue:
         raise ApiError("VALIDATION_ERROR", "patientMode must be returning.", 422)
 
     chat_service, workflow = get_services()
-    chat_session = chat_service.create_session("returning")
+    chat_session = chat_service.create_session(organization_id=workflow.organization_id, patient_mode="returning")
     _remember_session(chat_session.id)
     payload = workflow._session_payload(workflow._session_or_404(chat_session.id))
     if payload["messages"]:
@@ -161,16 +164,24 @@ def _patient_session_payload(
     patient_type: str,
 ) -> tuple[dict[str, object], int]:
     start_patient_session(patient.id)
-    existing = chat_service.find_latest_resumable_patient_session(patient_id=patient.id)
+    existing = chat_service.find_latest_resumable_patient_session(
+        organization_id=workflow.organization_id,
+        patient_id=patient.id,
+    )
     if existing is None:
         existing = chat_service.find_patient_session(
+            organization_id=workflow.organization_id,
             session_ids=remembered_patient_chat_session_ids(),
             patient_id=patient.id,
             patient_type=patient_type,
         )
     status = 200
     if existing is None:
-        existing = chat_service.create_patient_session(patient=patient, patient_type=patient_type)
+        existing = chat_service.create_patient_session(
+            organization_id=workflow.organization_id,
+            patient=patient,
+            patient_type=patient_type,
+        )
         _remember_session(existing.id)
         status = 201
     else:

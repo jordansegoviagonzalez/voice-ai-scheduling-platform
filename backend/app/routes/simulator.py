@@ -14,6 +14,7 @@ from app.models import Appointment, Call, Doctor, Patient, RoutingDecision, Tran
 from app.routes.common import bounded_string, int_or_none, json_body, parse_date, require_fields
 from app.services.booking import BookingService
 from app.services.confirmation import BookingConfirmationService
+from app.services.organization_context import default_organization_id
 from app.services.serializers import appointment_json, call_json, patient_json
 
 bp = Blueprint("simulator", __name__)
@@ -55,6 +56,7 @@ def simulator_preview():  # type: ignore[no-untyped-def]
         "issue_type",
     )
     session = get_session()
+    organization_id = default_organization_id(session)
     phone = normalize_phone(bounded_string(payload, "caller_phone", max_length=32) or "")
     first_name = bounded_string(payload, "first_name", max_length=100) or ""
     last_name = bounded_string(payload, "last_name", max_length=100) or ""
@@ -75,6 +77,7 @@ def simulator_preview():  # type: ignore[no-untyped-def]
         session.flush()
 
     call = Call(
+        organization_id=organization_id,
         patient_id=patient.id,
         status="IN_PROGRESS",
         caller_phone=phone,
@@ -99,6 +102,7 @@ def simulator_preview():  # type: ignore[no-untyped-def]
 
     routing = PhysicianRoutingService(session).recommend(
         RoutingRequest(
+            organization_id=organization_id,
             patient_id=patient.id,
             patient_status=patient_status,
             body_part=body_part,

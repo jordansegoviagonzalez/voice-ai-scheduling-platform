@@ -45,6 +45,14 @@ class BookingService:
             )
             if slot is None:
                 raise ApiError("SLOT_NOT_FOUND", "The selected appointment slot was not found.", 404)
+            if call_id is not None:
+                call = self.session.get(Call, call_id)
+                if call is None:
+                    raise ApiError("CALL_NOT_FOUND", "Call was not found.", 404)
+                if call.organization_id != slot.organization_id:
+                    raise ApiError("CALL_ORGANIZATION_MISMATCH", "The selected call does not match this slot.", 409)
+            else:
+                call = None
             patient = self.session.get(Patient, patient_id)
             if patient is None:
                 raise ApiError("PATIENT_NOT_FOUND", "Patient was not found.", 404)
@@ -76,6 +84,7 @@ class BookingService:
             patient_status = "RETURNING" if history_exists else "NEW"
             routing = PhysicianRoutingService(self.session).recommend(
                 RoutingRequest(
+                    organization_id=slot.organization_id,
                     patient_id=patient_id,
                     patient_status=patient_status,
                     body_part=body_part,
@@ -101,6 +110,7 @@ class BookingService:
                 )
 
             appointment = Appointment(
+                organization_id=slot.organization_id,
                 patient_id=patient_id,
                 doctor_id=slot.doctor_id,
                 location_id=slot.location_id,
@@ -138,10 +148,7 @@ class BookingService:
                 history.appointment_id = appointment.id
                 history.updated_at = now
 
-            if call_id is not None:
-                call = self.session.get(Call, call_id)
-                if call is None:
-                    raise ApiError("CALL_NOT_FOUND", "Call was not found.", 404)
+            if call is not None:
                 call.appointment_id = appointment.id
                 call.patient_id = patient_id
                 call.status = "SCHEDULED"

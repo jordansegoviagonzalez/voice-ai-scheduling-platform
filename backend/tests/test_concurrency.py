@@ -12,11 +12,13 @@ from app.models import Appointment, Call, Doctor, IntegrationRequestLog, Patient
 from app.services.booking import BookingService
 from app.services.confirmation import BookingConfirmationService
 from app.services.idempotency import IdempotencyService
+from app.services.organization_context import default_organization_id
 
 
 def test_scenario_i_two_concurrent_attempts_create_one_appointment(app: Flask) -> None:
     factory = get_session_factory()
     setup = factory()
+    organization_id = default_organization_id(setup)
     vasquez_id = setup.scalar(select(Doctor.id).where(Doctor.last_name == "Vasquez"))
     slot_id = setup.scalar(
         select(Slot.id).where(Slot.doctor_id == vasquez_id, Slot.status == "OPEN").order_by(Slot.starts_at)
@@ -27,6 +29,7 @@ def test_scenario_i_two_concurrent_attempts_create_one_appointment(app: Flask) -
     confirmation_tokens: dict[int, tuple[int, str]] = {}
     for patient_id in patient_ids:
         call = Call(
+            organization_id=organization_id,
             patient_id=patient_id,
             status="IN_PROGRESS",
             caller_phone=f"+1805555{patient_id:04d}",
@@ -143,6 +146,7 @@ def test_concurrent_idempotency_key_creates_one_request_log(app: Flask) -> None:
 def test_same_confirmation_token_concurrent_replay_books_once(app: Flask) -> None:
     factory = get_session_factory()
     setup = factory()
+    organization_id = default_organization_id(setup)
     vasquez_id = setup.scalar(select(Doctor.id).where(Doctor.last_name == "Vasquez"))
     slot_id = setup.scalar(
         select(Slot.id).where(Slot.doctor_id == vasquez_id, Slot.status == "OPEN").order_by(Slot.starts_at)
@@ -151,6 +155,7 @@ def test_same_confirmation_token_concurrent_replay_books_once(app: Flask) -> Non
     assert slot_id is not None
     assert patient_id is not None
     call = Call(
+        organization_id=organization_id,
         patient_id=patient_id,
         status="IN_PROGRESS",
         caller_phone="+18055550998",

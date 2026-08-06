@@ -10,6 +10,7 @@ from app.domain.chat.chat_state import ChatState
 from app.domain.chat.chat_steps import ChatStep
 from app.extensions import get_session_factory
 from app.models import ChatMessage, ChatSession, Patient
+from app.services.organization_context import default_organization_id
 
 GENERIC_ENTRY_QUESTION = "Hi, I can help you schedule an orthopedic appointment. Are you a new or returning patient?"
 
@@ -105,7 +106,11 @@ def test_failed_returning_patient_authentication_does_not_expose_patient_identit
 ) -> None:
     response = client.post(
         "/api/chat/sessions",
-        json={"patientMode": "returning", "email": "olivia.carter.phase2.demo@example.com", "password": "wrong-password"},
+        json={
+            "patientMode": "returning",
+            "email": "olivia.carter.phase2.demo@example.com",
+            "password": "wrong-password",
+        },
     )
 
     assert response.status_code == 401
@@ -145,6 +150,7 @@ def test_existing_historical_chat_messages_are_not_rewritten(client: FlaskClient
     session = get_session_factory()()
     try:
         historical = ChatSession(
+            organization_id=default_organization_id(session),
             status=ChatState.COLLECTING_INTAKE,
             current_step=ChatStep.COLLECT_INTAKE,
             collected_data_json={"patient_type": "returning"},

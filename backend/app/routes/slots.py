@@ -10,6 +10,7 @@ from app.domain.normalization import normalize_body_part, normalize_issue_type
 from app.extensions import get_session
 from app.models import Doctor, DoctorCapability, Slot
 from app.routes.common import int_or_none, parse_datetime
+from app.services.organization_context import default_organization_id
 from app.services.serializers import slot_json
 
 bp = Blueprint("slots", __name__)
@@ -23,10 +24,17 @@ def list_slots():  # type: ignore[no-untyped-def]
     issue_type = request.args.get("issue_type")
     starts_after = parse_datetime(request.args.get("starts_after"), "starts_after") or datetime.now(UTC)
     ends_before = parse_datetime(request.args.get("ends_before"), "ends_before") or starts_after + timedelta(days=14)
+    session = get_session()
+    organization_id = default_organization_id(session)
 
     statement = (
         select(Slot)
-        .where(Slot.status == "OPEN", Slot.starts_at >= starts_after, Slot.starts_at < ends_before)
+        .where(
+            Slot.organization_id == organization_id,
+            Slot.status == "OPEN",
+            Slot.starts_at >= starts_after,
+            Slot.starts_at < ends_before,
+        )
         .options(
             selectinload(Slot.doctor).selectinload(Doctor.locations),
             selectinload(Slot.doctor).selectinload(Doctor.capabilities),
@@ -45,5 +53,5 @@ def list_slots():  # type: ignore[no-untyped-def]
             DoctorCapability.body_part == canonical_body,
             DoctorCapability.issue_type == canonical_issue,
         )
-    slots = list(get_session().scalars(statement).unique())
+    slots = list(session.scalars(statement).unique())
     return jsonify({"slots": [slot_json(item) for item in slots]})

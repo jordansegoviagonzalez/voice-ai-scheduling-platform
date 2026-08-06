@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.domain.routing import PhysicianRoutingService, RoutingRequest
 from app.integrations.openai import OpenAIIntentAdapter, StructuredIntent
-from app.models import Doctor, Location
+from app.models import Call, Doctor, Location
 from app.services.integration_status import OPENAI_INTEGRATION, record_integration_result
+from app.services.organization_context import default_organization_id
 
 
 class ConversationOrchestrator:
@@ -32,8 +33,19 @@ class ConversationOrchestrator:
         patient_id: int | None = None,
         call_id: int | None = None,
     ) -> dict[str, Any]:
-        doctors = list(self.session.scalars(select(Doctor).where(Doctor.active.is_(True)).order_by(Doctor.last_name)))
-        locations = list(self.session.scalars(select(Location).order_by(Location.id)))
+        organization_id = self._organization_id(call_id)
+        doctors = list(
+            self.session.scalars(
+                select(Doctor)
+                .where(Doctor.organization_id == organization_id, Doctor.active.is_(True))
+                .order_by(Doctor.last_name)
+            )
+        )
+        locations = list(
+            self.session.scalars(
+                select(Location).where(Location.organization_id == organization_id).order_by(Location.id)
+            )
+        )
         intent = self.adapter.extract(
             raw_user_text=raw_user_text,
             known_doctor_names=[doctor.full_name for doctor in doctors],
@@ -74,6 +86,7 @@ class ConversationOrchestrator:
         )
         routing = PhysicianRoutingService(self.session).recommend(
             RoutingRequest(
+                organization_id=organization_id,
                 patient_id=patient_id,
                 patient_status=str(state["patient_status"]),
                 body_part=str(state["body_part"]),
@@ -144,8 +157,6 @@ class ConversationOrchestrator:
         doctors: list[Doctor],
         locations: list[Location],
     ) -> None:
-        from app.models import Call
-
         call = self.session.get(Call, call_id)
         if call is None or call.status in {"SCHEDULED", "REDIRECTED", "ABANDONED", "FAILED"}:
             return
@@ -159,6 +170,13 @@ class ConversationOrchestrator:
             call.preferred_doctor_id = self._doctor_id_for_name(str(state["preferred_doctor_name"]), doctors)
         if state.get("preferred_location_code"):
             call.preferred_location_id = self._location_id_for_code(str(state["preferred_location_code"]), locations)
+
+    def _organization_id(self, call_id: int | None) -> int:
+        if call_id is not None:
+            call = self.session.get(Call, call_id)
+            if call is not None:
+                return call.organization_id
+        return default_organization_id(self.session)
 
 
 def _intent_json(intent: StructuredIntent) -> dict[str, Any]:

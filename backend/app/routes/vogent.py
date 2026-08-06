@@ -21,6 +21,7 @@ from app.services.confirmation import BookingConfirmationService
 from app.services.conversation import ConversationOrchestrator
 from app.services.idempotency import IdempotencyService
 from app.services.integration_status import VOGENT_INTEGRATION, record_integration_result
+from app.services.organization_context import default_organization_id
 
 bp = Blueprint("vogent", __name__)
 
@@ -97,8 +98,11 @@ def vogent_routing():  # type: ignore[no-untyped-def]
 
     def handler(session):  # type: ignore[no-untyped-def]
         call_id = int_or_none(payload.get("call_id"), "call_id")
+        call = session.get(Call, call_id) if call_id is not None else None
+        organization_id = call.organization_id if call is not None else default_organization_id(session)
         result = PhysicianRoutingService(session).recommend(
             RoutingRequest(
+                organization_id=organization_id,
                 patient_id=int_or_none(payload.get("patient_id"), "patient_id"),
                 patient_status=bounded_string(payload, "patient_status", max_length=16) or "",
                 body_part=bounded_string(payload, "body_part", max_length=32) or "",
@@ -277,6 +281,7 @@ def vogent_webhooks():  # type: ignore[no-untyped-def]
         call = session.scalar(select(Call).where(Call.external_call_id == external_id))
         if call is None:
             call = Call(
+                organization_id=default_organization_id(session),
                 external_call_id=external_id,
                 status="IN_PROGRESS",
                 caller_phone=str(data.get("source_number", "unknown")),

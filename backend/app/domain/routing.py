@@ -30,6 +30,7 @@ CLINIC_TIMEZONE_LABEL = "America/Los_Angeles"
 
 @dataclass(frozen=True)
 class RoutingRequest:
+    organization_id: int
     patient_id: int | None
     patient_status: str
     body_part: str
@@ -63,19 +64,19 @@ class PhysicianRoutingService:
             raise ApiError("INVALID_DATE_RANGE", "The end date must be after the start date.", 422)
 
         patient = self._get_patient(request.patient_id)
-        preferred_doctor = self._get_doctor(request.preferred_doctor_id)
-        preferred_location = self._get_location(request.preferred_location_id)
+        preferred_doctor = self._get_doctor(request.preferred_doctor_id, request.organization_id)
+        preferred_location = self._get_location(request.preferred_location_id, request.organization_id)
 
         doctors = list(
             self.session.scalars(
                 select(Doctor)
-                .where(Doctor.active.is_(True))
+                .where(Doctor.organization_id == request.organization_id, Doctor.active.is_(True))
                 .options(selectinload(Doctor.capabilities), selectinload(Doctor.locations))
                 .order_by(Doctor.last_name, Doctor.first_name)
             )
         )
-        history_doctor_ids = self._history_doctor_ids(patient.id if patient else None)
-        open_slots = self._open_slots(starts_after, ends_before)
+        history_doctor_ids = self._history_doctor_ids(patient.id if patient else None, request.organization_id)
+        open_slots = self._open_slots(request.organization_id, starts_after, ends_before)
         slots_by_doctor: dict[int, list[Slot]] = {}
         for slot in open_slots:
             slots_by_doctor.setdefault(slot.doctor_id, []).append(slot)
@@ -117,6 +118,7 @@ class PhysicianRoutingService:
                 decisions.append(
                     self._decision(
                         request.call_id,
+                        request.organization_id,
                         request.patient_id,
                         doctor.id,
                         "REJECTED",
@@ -162,6 +164,7 @@ class PhysicianRoutingService:
             decisions.append(
                 self._decision(
                     request.call_id,
+                    request.organization_id,
                     request.patient_id,
                     doctor.id,
                     "ACCEPTED",
@@ -182,6 +185,7 @@ class PhysicianRoutingService:
                 decisions.append(
                     self._decision(
                         request.call_id,
+                        request.organization_id,
                         request.patient_id,
                         doctor.id,
                         "REJECTED",
@@ -204,7 +208,7 @@ class PhysicianRoutingService:
         ranked = self._top_three_recommendations(ranked_candidates)
 
         recommendation = ranked[0] if ranked else None
-        context["locations_searched"] = self._locations_searched(preferred_location)
+        context["locations_searched"] = self._locations_searched(request.organization_id, preferred_location)
         context["ranked_recommendations"] = [self._recommendation_context(item) for item in ranked]
         location_fallback = self._location_fallback(preferred_location, recommendation)
         if location_fallback:
@@ -227,6 +231,7 @@ class PhysicianRoutingService:
             decisions.append(
                 self._decision(
                     request.call_id,
+                    request.organization_id,
                     request.patient_id,
                     recommendation["doctor"]["id"],
                     "ACCEPTED",
@@ -267,36 +272,45 @@ class PhysicianRoutingService:
             raise ApiError("PATIENT_NOT_FOUND", "Patient was not found.", 404)
         return patient
 
-    def _get_doctor(self, doctor_id: int | None) -> Doctor | None:
+    def _get_doctor(self, doctor_id: int | None, organization_id: int) -> Doctor | None:
         if doctor_id is None:
             return None
-        doctor = self.session.get(Doctor, doctor_id)
+        doctor = self.session.scalar(
+            select(Doctor)
+            .where(Doctor.id == doctor_id, Doctor.organization_id == organization_id)
+            .options(selectinload(Doctor.capabilities), selectinload(Doctor.locations))
+        )
         if doctor is None:
             raise ApiError("DOCTOR_NOT_FOUND", "Preferred physician was not found.", 404)
         return doctor
 
-    def _get_location(self, location_id: int | None) -> Location | None:
+    def _get_location(self, location_id: int | None, organization_id: int) -> Location | None:
         if location_id is None:
             return None
-        location = self.session.get(Location, location_id)
+        location = self.session.scalar(
+            select(Location).where(Location.id == location_id, Location.organization_id == organization_id)
+        )
         if location is None:
             raise ApiError("LOCATION_NOT_FOUND", "Preferred location was not found.", 404)
         return location
 
-    def _history_doctor_ids(self, patient_id: int | None) -> set[int]:
+    def _history_doctor_ids(self, patient_id: int | None, organization_id: int) -> set[int]:
         if patient_id is None:
             return set()
         return set(
             self.session.scalars(
-                select(PatientDoctorHistory.doctor_id).where(PatientDoctorHistory.patient_id == patient_id)
+                select(PatientDoctorHistory.doctor_id)
+                .join(Doctor, PatientDoctorHistory.doctor_id == Doctor.id)
+                .where(PatientDoctorHistory.patient_id == patient_id, Doctor.organization_id == organization_id)
             )
         )
 
-    def _open_slots(self, starts_after: datetime, ends_before: datetime) -> list[Slot]:
+    def _open_slots(self, organization_id: int, starts_after: datetime, ends_before: datetime) -> list[Slot]:
         statement: Select[tuple[Slot]] = (
             select(Slot)
             .where(
                 and_(
+                    Slot.organization_id == organization_id,
                     Slot.status == "OPEN",
                     Slot.starts_at >= starts_after,
                     Slot.starts_at < ends_before,
@@ -495,8 +509,9 @@ class PhysicianRoutingService:
     def _location_payload(location: Location) -> dict[str, Any]:
         return {"id": location.id, "code": location.code, "name": location.name}
 
-    def _locations_searched(self, preferred_location: Location | None) -> list[dict[str, Any]]:
-        locations = list(self.session.scalars(select(Location)))
+    def _locations_searched(self, organization_id: int, preferred_location: Location | None) -> list[dict[str, Any]]:
+        statement = select(Location).where(Location.organization_id == organization_id)
+        locations = list(self.session.scalars(statement))
         locations = sorted(
             locations,
             key=lambda item: (
@@ -537,6 +552,7 @@ class PhysicianRoutingService:
     @staticmethod
     def _decision(
         call_id: int | None,
+        organization_id: int,
         patient_id: int | None,
         doctor_id: int | None,
         decision: str,
@@ -545,6 +561,7 @@ class PhysicianRoutingService:
         context: dict[str, Any],
     ) -> RoutingDecision:
         return RoutingDecision(
+            organization_id=organization_id,
             call_id=call_id,
             patient_id=patient_id,
             doctor_id=doctor_id,

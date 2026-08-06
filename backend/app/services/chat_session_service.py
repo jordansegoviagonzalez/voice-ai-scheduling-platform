@@ -22,8 +22,9 @@ class ChatSessionService:
     def __init__(self, db_session: Session):
         self.session = db_session
 
-    def create_session(self, patient_mode: str | None) -> ChatSession:
+    def create_session(self, *, organization_id: int, patient_mode: str | None) -> ChatSession:
         chat_session = ChatSession(
+            organization_id=organization_id,
             status=ChatState.PATIENT_ACCESS,
             current_step=ChatStep.IDENTIFY_PATIENT,
             collected_data_json={"patient_type": patient_mode} if patient_mode else {},
@@ -32,10 +33,11 @@ class ChatSessionService:
         self.session.commit()
         return chat_session
 
-    def create_patient_session(self, *, patient: Patient, patient_type: str) -> ChatSession:
+    def create_patient_session(self, *, organization_id: int, patient: Patient, patient_type: str) -> ChatSession:
         if patient_type not in WELCOME_MESSAGES:
             raise ValueError("patient_type must be new or returning")
         chat_session = ChatSession(
+            organization_id=organization_id,
             patient_id=patient.id,
             status=ChatState.COLLECTING_INTAKE,
             current_step=ChatStep.COLLECT_INTAKE,
@@ -54,6 +56,7 @@ class ChatSessionService:
     def find_patient_session(
         self,
         *,
+        organization_id: int,
         session_ids: list[int],
         patient_id: int,
         patient_type: str,
@@ -64,6 +67,7 @@ class ChatSessionService:
             select(ChatSession)
             .where(
                 ChatSession.id.in_(session_ids),
+                ChatSession.organization_id == organization_id,
                 ChatSession.patient_id == patient_id,
                 ChatSession.status.in_(RESUMABLE_STATES),
                 ChatSession.completed_at.is_(None),
@@ -75,10 +79,11 @@ class ChatSessionService:
                 return chat_session
         return None
 
-    def find_latest_resumable_patient_session(self, *, patient_id: int) -> ChatSession | None:
+    def find_latest_resumable_patient_session(self, *, organization_id: int, patient_id: int) -> ChatSession | None:
         return self.session.scalar(
             select(ChatSession)
             .where(
+                ChatSession.organization_id == organization_id,
                 ChatSession.patient_id == patient_id,
                 ChatSession.status.in_(RESUMABLE_STATES),
                 ChatSession.completed_at.is_(None),

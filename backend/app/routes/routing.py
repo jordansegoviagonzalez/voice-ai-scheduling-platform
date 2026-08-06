@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from app.domain.routing import PhysicianRoutingService, RoutingRequest
 from app.extensions import get_session
 from app.routes.common import int_or_none, json_body, parse_datetime, require_fields
+from app.services.organization_context import default_organization_id
 
 bp = Blueprint("routing", __name__)
 
@@ -14,8 +15,10 @@ def routing_recommendations():  # type: ignore[no-untyped-def]
     payload = json_body(request)
     require_fields(payload, "patient_status", "body_part", "issue_type")
     session = get_session()
+    organization_id = default_organization_id(session)
     result = PhysicianRoutingService(session).recommend(
         RoutingRequest(
+            organization_id=organization_id,
             patient_id=int_or_none(payload.get("patient_id"), "patient_id"),
             patient_status=str(payload["patient_status"]),
             body_part=str(payload["body_part"]),

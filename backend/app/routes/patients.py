@@ -10,6 +10,7 @@ from app.errors import ApiError
 from app.extensions import get_session
 from app.models import Appointment, Doctor, Patient
 from app.routes.common import bounded_string, json_body, parse_date, require_fields
+from app.services.organization_context import default_organization_id
 from app.services.serializers import appointment_json, patient_json
 
 bp = Blueprint("patients", __name__)
@@ -71,10 +72,11 @@ def get_patient_appointments(patient_id: int):  # type: ignore[no-untyped-def]
     session = get_session()
     if session.get(Patient, patient_id) is None:
         raise ApiError("PATIENT_NOT_FOUND", "Patient was not found.", 404)
+    organization_id = default_organization_id(session)
     appointments = list(
         session.scalars(
             select(Appointment)
-            .where(Appointment.patient_id == patient_id)
+            .where(Appointment.organization_id == organization_id, Appointment.patient_id == patient_id)
             .options(
                 selectinload(Appointment.patient),
                 selectinload(Appointment.doctor).selectinload(Doctor.locations),

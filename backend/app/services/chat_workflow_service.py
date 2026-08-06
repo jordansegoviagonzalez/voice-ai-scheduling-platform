@@ -12,7 +12,7 @@ from app.domain.chat.chat_state import ChatState
 from app.domain.chat.chat_steps import ChatStep
 from app.domain.routing import PhysicianRoutingService, RoutingRequest
 from app.errors import ApiError
-from app.models import Appointment, Doctor, Location
+from app.models import Appointment, Doctor, Location, Slot
 from app.models.chat import ChatMessage, ChatSession, ChatSessionEvent
 from app.services.ai_intake_service import AIIntakeService
 from app.services.booking import BookingService
@@ -43,6 +43,7 @@ class ChatWorkflowService:
     def __init__(
         self,
         *,
+        organization_id: int,
         db_session: Session,
         chat_service: ChatSessionService,
         patient_access: PatientAccessService,
@@ -51,6 +52,7 @@ class ChatWorkflowService:
         routing: PhysicianRoutingService,
         booking: BookingService,
     ):
+        self.organization_id = organization_id
         self.session = db_session
         self.chat_service = chat_service
         self.patient_access = patient_access
@@ -167,6 +169,7 @@ class ChatWorkflowService:
         if chat_session.status not in {ChatState.SELECTING_APPOINTMENT, ChatState.CONFIRMED}:
             raise ApiError("SESSION_NOT_READY", "Not ready to select an appointment.", 409)
 
+        self._assert_slot_in_session_organization(chat_session, slot_id)
         if not self._slot_was_offered(chat_session, slot_id):
             raise ApiError("SLOT_NOT_OFFERED", "The selected slot was not offered for this intake.", 422)
 
@@ -196,6 +199,7 @@ class ChatWorkflowService:
 
         if chat_session.status != ChatState.SELECTING_APPOINTMENT:
             raise ApiError("SESSION_NOT_READY", "Choose an appointment slot before confirming.", 409)
+        self._assert_slot_in_session_organization(chat_session, slot_id)
         if not self._slot_was_offered(chat_session, slot_id):
             raise ApiError("SLOT_NOT_OFFERED", "The selected slot was not offered for this intake.", 422)
 
@@ -316,6 +320,7 @@ class ChatWorkflowService:
         doctor_id = self._doctor_id_for_preference(data.get("preferred_physician"))
         routing_result = self.routing.recommend(
             RoutingRequest(
+                organization_id=chat_session.organization_id,
                 patient_id=chat_session.patient_id,
                 patient_status=str(data.get("patient_type", "new")).upper(),
                 body_part=str(data["body_part"]),
@@ -487,13 +492,17 @@ class ChatWorkflowService:
         code = str(value).strip().upper()
         if code in {"ANY", "NEAREST", "NEAREST_AVAILABLE", "EARLIEST_ANY_LOCATION"}:
             return None
-        return self.session.scalar(select(Location.id).where(Location.code == code))
+        return self.session.scalar(
+            select(Location.id).where(Location.organization_id == self.organization_id, Location.code == code)
+        )
 
     def _doctor_id_for_preference(self, value: object) -> int | None:
         if not value:
             return None
         cleaned = _doctor_key(str(value))
-        doctors = self.session.scalars(select(Doctor).where(Doctor.active.is_(True))).all()
+        doctors = self.session.scalars(
+            select(Doctor).where(Doctor.organization_id == self.organization_id, Doctor.active.is_(True))
+        ).all()
         for doctor in doctors:
             if cleaned in {_doctor_key(doctor.full_name), _doctor_key(doctor.last_name)}:
                 return doctor.id
@@ -503,7 +512,14 @@ class ChatWorkflowService:
         chat_session = self.chat_service.get_session(session_id)
         if chat_session is None:
             raise ApiError("CHAT_SESSION_NOT_FOUND", "Chat session was not found.", 404)
+        if chat_session.organization_id != self.organization_id:
+            raise ApiError("CHAT_SESSION_NOT_FOUND", "Chat session was not found.", 404)
         return chat_session
+
+    def _assert_slot_in_session_organization(self, chat_session: ChatSession, slot_id: int) -> None:
+        slot_organization_id = self.session.scalar(select(Slot.organization_id).where(Slot.id == slot_id))
+        if slot_organization_id != chat_session.organization_id:
+            raise ApiError("SLOT_NOT_OFFERED", "The selected slot was not offered for this intake.", 422)
 
     def _session_payload(self, chat_session: ChatSession, *, assistant_message: object | None = None) -> dict[str, Any]:
         routing_result = chat_session.routing_result_json or {}

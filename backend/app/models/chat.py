@@ -7,6 +7,7 @@ from sqlalchemy import (
     JSON,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -14,13 +15,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.entities import Appointment, Patient
+from app.models.entities import Appointment, Organization, Patient
 
 
 class ChatSession(Base, TimestampMixin):
     __tablename__ = "chat_sessions"
+    __table_args__ = (Index("ix_chat_sessions_org_status", "organization_id", "status"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"))
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     current_step: Mapped[str] = mapped_column(String(64), nullable=False, default="patient_access")
@@ -34,6 +37,7 @@ class ChatSession(Base, TimestampMixin):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    organization: Mapped[Organization] = relationship()
     patient: Mapped[Patient | None] = relationship()
     appointment: Mapped[Appointment | None] = relationship(back_populates="chat_session")
     messages: Mapped[list[ChatMessage]] = relationship(

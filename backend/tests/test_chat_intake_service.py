@@ -23,6 +23,7 @@ from app.services.booking import BookingService
 from app.services.chat_session_service import ChatSessionService
 from app.services.chat_workflow_service import ChatWorkflowService
 from app.services.escalation_service import EscalationService
+from app.services.organization_context import default_organization_id
 from app.services.patient_access_service import PatientAccessService
 
 TIME_QUESTION = "Do you prefer morning, afternoon, or does any time work?"
@@ -513,6 +514,7 @@ def test_web_recommendations_deduplicate_identical_slots(app: Flask) -> None:
 
 def _workflow(db_session: Session, chat_service: ChatSessionService) -> ChatWorkflowService:
     return ChatWorkflowService(
+        organization_id=default_organization_id(db_session),
         db_session=db_session,
         chat_service=chat_service,
         patient_access=PatientAccessService(db_session),
@@ -549,6 +551,7 @@ def _create_olivia_session_at_time_preference(
     if preferred_time_of_day is not None:
         collected_data["preferred_time_of_day"] = preferred_time_of_day
     chat_session = ChatSession(
+        organization_id=default_organization_id(db_session),
         patient_id=olivia.id,
         status=ChatState.COLLECTING_INTAKE,
         current_step=ChatStep.COLLECT_INTAKE,
@@ -575,6 +578,7 @@ def _create_sophia_session_at_availability_preference(
     db_session.add(sophia)
     db_session.flush()
     chat_session = ChatSession(
+        organization_id=default_organization_id(db_session),
         patient_id=sophia.id,
         status=ChatState.COLLECTING_INTAKE,
         current_step=ChatStep.COLLECT_INTAKE,

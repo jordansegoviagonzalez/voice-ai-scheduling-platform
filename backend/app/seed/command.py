@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.models.entities import DoctorLocation
 from app.seed.data import DOCTORS, LOCATIONS
+from app.services.organization_context import default_organization
 from app.services.patient_account_security import hash_patient_password, verify_patient_password
 
 OLIVIA_DEMO_EMAIL = "olivia.carter.phase2.demo@example.com"
@@ -60,11 +61,18 @@ def _doctor_last_name_aliases(last_name: str) -> list[str]:
 
 
 def seed_database(session: Session) -> None:
+    organization = default_organization(session)
+    organization_id = organization.id
     location_by_code: dict[str, Location] = {}
     for location_seed in LOCATIONS:
-        location = session.scalar(select(Location).where(Location.code == location_seed["code"]))
+        location = session.scalar(
+            select(Location).where(
+                Location.organization_id == organization_id,
+                Location.code == location_seed["code"],
+            )
+        )
         if location is None:
-            location = Location(**location_seed)
+            location = Location(organization_id=organization_id, **location_seed)
             session.add(location)
             session.flush()
         else:
@@ -75,12 +83,14 @@ def seed_database(session: Session) -> None:
     for doctor_seed in DOCTORS:
         doctor = session.scalar(
             select(Doctor).where(
+                Doctor.organization_id == organization_id,
                 Doctor.first_name == doctor_seed["first_name"],
                 Doctor.last_name.in_(_doctor_last_name_aliases(doctor_seed["last_name"])),
             )
         )
         if doctor is None:
             doctor = Doctor(
+                organization_id=organization_id,
                 first_name=doctor_seed["first_name"],
                 last_name=doctor_seed["last_name"],
                 accepts_new_patients=doctor_seed["accepts_new_patients"],
@@ -215,6 +225,7 @@ def seed_database(session: Session) -> None:
                     )
                     if slot is None:
                         slot = Slot(
+                            organization_id=organization_id,
                             doctor_id=doctor.id,
                             location_id=location.id,
                             starts_at=starts_at,
@@ -241,6 +252,7 @@ def seed_database(session: Session) -> None:
         session,
         doctor=doctor_by_last_name[GENERAL_ORTHOPEDICS_LAST_NAME],
         location_by_code=location_by_code,
+        organization_id=organization_id,
     )
     session.flush()
 
@@ -260,6 +272,7 @@ def seed_database(session: Session) -> None:
     demo_call = session.scalar(select(Call).where(Call.external_call_id == "demo-scheduled-001"))
     if demo_call is None:
         demo_call = Call(
+            organization_id=organization_id,
             external_call_id="demo-scheduled-001",
             patient_id=sarah.id,
             status="SCHEDULED",
@@ -303,6 +316,7 @@ def seed_database(session: Session) -> None:
         session.add_all(
             [
                 RoutingDecision(
+                    organization_id=organization_id,
                     call_id=demo_call.id,
                     patient_id=sarah.id,
                     doctor_id=doctor_by_last_name["Chen"].id,
@@ -316,6 +330,7 @@ def seed_database(session: Session) -> None:
                     created_at=demo_call.started_at + timedelta(minutes=1),
                 ),
                 RoutingDecision(
+                    organization_id=organization_id,
                     call_id=demo_call.id,
                     patient_id=sarah.id,
                     doctor_id=vasquez.id,
@@ -331,6 +346,7 @@ def seed_database(session: Session) -> None:
         )
         if scheduled_slot is not None:
             appointment = Appointment(
+                organization_id=organization_id,
                 patient_id=sarah.id,
                 doctor_id=vasquez.id,
                 location_id=main.id,
@@ -370,6 +386,7 @@ def seed_database(session: Session) -> None:
             patient = patient_by_phone.get(phone)
             session.add(
                 Call(
+                    organization_id=organization_id,
                     external_call_id=external_id,
                     patient_id=patient.id if patient else None,
                     status=status,
@@ -399,6 +416,7 @@ def _seed_general_orthopedics_rotation(
     *,
     doctor: Doctor,
     location_by_code: dict[str, Location],
+    organization_id: int,
 ) -> None:
     now = datetime.now(UTC)
     local_today = now.astimezone(CLINIC_TIMEZONE).date()
@@ -423,6 +441,7 @@ def _seed_general_orthopedics_rotation(
             )
             if slot is None:
                 slot = Slot(
+                    organization_id=organization_id,
                     doctor_id=doctor.id,
                     location_id=location.id,
                     starts_at=starts_at,

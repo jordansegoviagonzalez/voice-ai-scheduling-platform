@@ -43,6 +43,8 @@ class BookingConfirmationService:
                 raise ApiError("CALL_PATIENT_MISMATCH", "The selected patient does not match the active call.", 409)
 
             slot = self._open_slot(slot_id)
+            if call is not None and call.organization_id != slot.organization_id:
+                raise ApiError("CALL_ORGANIZATION_MISMATCH", "The selected call does not match this slot.", 409)
             normalized_body_part = normalize_body_part(body_part)
             normalized_issue_type = normalize_issue_type(issue_type)
             self._assert_slot_still_eligible(
@@ -211,6 +213,7 @@ class BookingConfirmationService:
     ) -> None:
         routing = PhysicianRoutingService(self.session).recommend(
             RoutingRequest(
+                organization_id=slot.organization_id,
                 patient_id=patient_id,
                 patient_status=self._patient_status(patient_id, slot.doctor_id),
                 body_part=body_part,

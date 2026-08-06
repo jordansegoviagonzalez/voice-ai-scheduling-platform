@@ -10,6 +10,7 @@ from app.extensions import get_session_factory
 from app.integrations.openai.client import OpenAIIntentAdapter
 from app.models import Appointment, Call
 from app.services.conversation import ConversationOrchestrator
+from app.services.organization_context import default_organization_id
 
 
 class FakeProvider:
@@ -106,6 +107,7 @@ def test_orchestrator_applies_caller_correction_to_state(app: Flask) -> None:
 def test_conversation_state_is_reconstructable_after_new_session(app: Flask) -> None:
     session = get_session_factory()()
     call = Call(
+        organization_id=default_organization_id(session),
         status="IN_PROGRESS",
         caller_phone="+18055556666",
         started_at=datetime.now(UTC),

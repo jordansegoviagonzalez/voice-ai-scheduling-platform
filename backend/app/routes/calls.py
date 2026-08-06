@@ -10,6 +10,7 @@ from app.errors import ApiError
 from app.extensions import get_session
 from app.models import Appointment, Call, Doctor, RoutingDecision, TranscriptTurn
 from app.routes.common import bounded_string, int_or_none, json_body, parse_datetime, require_fields
+from app.services.organization_context import default_organization_id
 from app.services.serializers import call_json
 
 bp = Blueprint("calls", __name__)
@@ -48,8 +49,10 @@ def create_call():  # type: ignore[no-untyped-def]
     payload = json_body(request)
     require_fields(payload, "caller_phone")
     session = get_session()
+    organization_id = default_organization_id(session)
     caller_phone = bounded_string(payload, "caller_phone", max_length=32) or ""
     call = Call(
+        organization_id=organization_id,
         external_call_id=bounded_string(payload, "external_call_id", max_length=128, required=False),
         patient_id=int_or_none(payload.get("patient_id"), "patient_id"),
         status=str(payload.get("status", "IN_PROGRESS")).upper(),
@@ -76,7 +79,9 @@ def create_call():  # type: ignore[no-untyped-def]
 def update_call(call_id: int):  # type: ignore[no-untyped-def]
     payload = json_body(request)
     session = get_session()
-    call = session.get(Call, call_id)
+    call = session.scalar(
+        select(Call).where(Call.id == call_id, Call.organization_id == default_organization_id(session))
+    )
     if call is None:
         raise ApiError("CALL_NOT_FOUND", "Call was not found.", 404)
     if "status" in payload:
@@ -106,7 +111,9 @@ def add_transcript_turn(call_id: int):  # type: ignore[no-untyped-def]
     payload = json_body(request)
     require_fields(payload, "speaker", "text")
     session = get_session()
-    call = session.get(Call, call_id)
+    call = session.scalar(
+        select(Call).where(Call.id == call_id, Call.organization_id == default_organization_id(session))
+    )
     if call is None:
         raise ApiError("CALL_NOT_FOUND", "Call was not found.", 404)
     latest_sequence = session.scalar(
@@ -163,8 +170,10 @@ def list_calls():  # type: ignore[no-untyped-def]
     search = request.args.get("search")
     starts_after = parse_datetime(request.args.get("starts_after"), "starts_after")
     ends_before = parse_datetime(request.args.get("ends_before"), "ends_before")
+    session = get_session()
+    organization_id = default_organization_id(session)
 
-    statement = _call_query().order_by(Call.started_at.desc())
+    statement = _call_query().where(Call.organization_id == organization_id).order_by(Call.started_at.desc())
     if status:
         statement = statement.where(Call.status == status.upper())
     if doctor_id:
@@ -188,13 +197,16 @@ def list_calls():  # type: ignore[no-untyped-def]
                 Call.patient.has(last_name=search),
             )
         )
-    calls = list(get_session().scalars(statement).unique())
+    calls = list(session.scalars(statement).unique())
     return jsonify({"calls": [call_json(item) for item in calls]})
 
 
 @bp.get("/calls/<int:call_id>")
 def get_call(call_id: int):  # type: ignore[no-untyped-def]
-    call = get_session().scalar(_call_query(detailed=True).where(Call.id == call_id))
+    session = get_session()
+    call = session.scalar(
+        _call_query(detailed=True).where(Call.id == call_id, Call.organization_id == default_organization_id(session))
+    )
     if call is None:
         raise ApiError("CALL_NOT_FOUND", "Call was not found.", 404)
     return jsonify({"call": call_json(call, detailed=True)})
