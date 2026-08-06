@@ -1,6 +1,6 @@
 # AWS EC2 Docker Deployment
 
-This deployment is intentionally sized for the work trial: one EC2 host running Nginx, Gunicorn/Flask, and PostgreSQL through Docker Compose. PostgreSQL uses a persistent named volume and has no public port.
+This deployment is intentionally sized for a compact review environment: one EC2 host running Nginx, Gunicorn/Flask, and PostgreSQL through Docker Compose. PostgreSQL uses a persistent named volume and has no public port.
 
 ## 1. Launch the instance
 
@@ -221,7 +221,7 @@ docker compose -f docker-compose.prod.yml down -v
 
 ## 14. Optional HTTPS
 
-A custom domain is not required for the work trial. When one is available:
+A custom domain is optional. When one is available:
 
 1. Point an A/AAAA record to the EC2 address.
 2. Permit inbound `443`.

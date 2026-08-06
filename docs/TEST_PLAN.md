@@ -2,7 +2,7 @@
 
 ## Test strategy
 
-The test suite separates deterministic domain behavior, HTTP workflows, concurrency, and frontend presentation. Backend tests use isolated databases for speed and reproducibility. Production uses PostgreSQL; the booking implementation adds PostgreSQL row locking and retains a database uniqueness constraint as the final invariant.
+The test suite separates deterministic domain behavior, HTTP workflows, concurrency, and frontend rendering. Backend tests use isolated databases for speed and reproducibility. Production uses PostgreSQL; the booking implementation adds PostgreSQL row locking and retains a database uniqueness constraint as the final invariant.
 
 ## Automated commands
 
@@ -170,6 +170,6 @@ The helper executes one paid synthetic interpretation request and fails nonzero 
 - Health check passes under Gunicorn.
 - Docker Compose builds and starts on a Docker-capable host.
 - No core dashboard page uses hardcoded records.
-- No secret or synthetic-data violation appears in the repository or video.
+- No secret or synthetic-data violation appears in the repository.
 
-Latest full-suite result after OpenAI live local verification: backend `pytest -q` passed with `75` tests, Ruff format/lint and mypy passed, frontend Vitest passed with `9` tests, frontend lint passed, and frontend build passed with the existing chunk-size warning. Re-run before submission after any code change.
+Latest recorded full-suite result after credentialed intake verification: backend `pytest -q` passed with `75` tests, Ruff format/lint and mypy passed, frontend Vitest passed with `9` tests, frontend lint passed, and frontend build passed with the existing chunk-size warning. Re-run before sharing after any code change.
