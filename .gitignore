@@ -54,7 +54,7 @@ recordings/
 .idea/
 .vscode/
 .codex/
-AGENTS.md
+docs/agent-notes/
 docs/agent-notes/**
 docs/reports/**
 docs/codex.md
