@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from app.domain.organizations import organization_type_for_slug
 from app.domain.locations import location_sort_key
 from app.domain.specialties import is_general_orthopedics, primary_specialty
 from app.models import (
@@ -25,6 +26,8 @@ def organization_json(organization: Organization) -> dict[str, Any]:
         "id": organization.id,
         "slug": organization.slug,
         "name": organization.name,
+        "organization_type": organization_type_for_slug(organization.slug),
+        "doctor_count": len(organization.doctors),
         "status": organization.status,
         "timezone": organization.timezone,
         "active": organization.status == "ACTIVE",
@@ -38,6 +41,7 @@ def public_organization_json(organization: Organization) -> dict[str, Any]:
         "id": organization.id,
         "slug": organization.slug,
         "name": organization.name,
+        "organization_type": organization_type_for_slug(organization.slug),
         "status": organization.status,
         "timezone": organization.timezone,
     }

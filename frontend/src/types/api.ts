@@ -1,7 +1,30 @@
 export type CallStatus = 'SCHEDULED' | 'REDIRECTED' | 'ABANDONED' | 'FAILED' | 'IN_PROGRESS';
 
+export type OrganizationStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface Organization {
+  id: number;
+  slug: string;
+  name: string;
+  organization_type?: string;
+  doctor_count?: number;
+  status: OrganizationStatus;
+  timezone: string;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OrganizationInput {
+  name: string;
+  slug?: string;
+  status?: OrganizationStatus;
+  timezone?: string;
+}
+
 export interface Location {
   id: number;
+  organization_id: number;
   code: string;
   name: string;
 }
@@ -13,6 +36,7 @@ export interface Capability {
 
 export interface Doctor {
   id: number;
+  organization_id: number;
   first_name: string;
   last_name: string;
   full_name: string;
@@ -22,6 +46,15 @@ export interface Doctor {
   active: boolean;
   locations: Location[];
   capabilities: Capability[];
+}
+
+export interface DoctorInput {
+  first_name: string;
+  last_name: string;
+  accepts_new_patients: boolean;
+  active?: boolean;
+  location_ids?: number[];
+  capabilities?: Capability[];
 }
 
 export interface Patient {

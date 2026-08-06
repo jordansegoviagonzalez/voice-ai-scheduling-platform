@@ -8,6 +8,7 @@ import type { Appointment, RoutingDecision, TranscriptTurn } from '../src/types/
 
 const doctor = {
   id: 1,
+  organization_id: 1,
   first_name: 'Elena',
   last_name: 'Vasquez',
   full_name: 'Dr. Elena Vasquez',
@@ -15,7 +16,7 @@ const doctor = {
   is_general_orthopedics: false,
   accepts_new_patients: true,
   active: true,
-  locations: [{ id: 1, code: 'MAIN', name: 'Main Campus' }],
+  locations: [{ id: 1, organization_id: 1, code: 'MAIN', name: 'Main Campus' }],
   capabilities: [{ body_part: 'Knee', issue_type: 'Fracture' }],
 };
 

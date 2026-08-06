@@ -15,6 +15,7 @@ from app.models import (
     Doctor,
     DoctorCapability,
     Location,
+    Organization,
     Patient,
     PatientDoctorHistory,
     RoutingDecision,
@@ -22,7 +23,7 @@ from app.models import (
     TranscriptTurn,
 )
 from app.models.entities import DoctorLocation
-from app.seed.data import DOCTORS, LOCATIONS
+from app.seed.data import DEMO_ORGANIZATIONS, DOCTORS, LOCATIONS
 from app.services.organization_context import default_organization
 from app.services.patient_account_security import hash_patient_password, verify_patient_password
 
@@ -60,8 +61,20 @@ def _doctor_last_name_aliases(last_name: str) -> list[str]:
     return [last_name]
 
 
+def _seed_demo_organizations(session: Session) -> None:
+    for organization_seed in DEMO_ORGANIZATIONS:
+        organization = session.scalar(select(Organization).where(Organization.slug == organization_seed["slug"]))
+        if organization is None:
+            session.add(Organization(**organization_seed))
+            continue
+        organization.name = organization_seed["name"]
+        organization.status = organization_seed["status"]
+        organization.timezone = organization_seed["timezone"]
+
+
 def seed_database(session: Session) -> None:
     organization = default_organization(session)
+    _seed_demo_organizations(session)
     organization_id = organization.id
     location_by_code: dict[str, Location] = {}
     for location_seed in LOCATIONS:

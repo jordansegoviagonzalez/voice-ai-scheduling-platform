@@ -16,6 +16,41 @@ class DoctorSeed(TypedDict):
     capabilities: list[tuple[str, str]]
 
 
+class OrganizationSeed(TypedDict):
+    slug: str
+    name: str
+    status: str
+    timezone: str
+
+
+DEMO_ORGANIZATIONS: list[OrganizationSeed] = [
+    {
+        "slug": "northside-dental-care",
+        "name": "Northside Dental Care",
+        "status": "ACTIVE",
+        "timezone": "America/Los_Angeles",
+    },
+    {
+        "slug": "summit-family-medicine",
+        "name": "Summit Family Medicine",
+        "status": "ACTIVE",
+        "timezone": "America/Denver",
+    },
+    {
+        "slug": "westview-dermatology-clinic",
+        "name": "Westview Dermatology Clinic",
+        "status": "ACTIVE",
+        "timezone": "America/Chicago",
+    },
+    {
+        "slug": "harbor-pediatrics",
+        "name": "Harbor Pediatrics",
+        "status": "ACTIVE",
+        "timezone": "America/New_York",
+    },
+]
+
+
 LOCATIONS: list[LocationSeed] = [
     {"code": "MAIN", "name": "Main Campus"},
     {"code": "EAST", "name": "East Clinic"},

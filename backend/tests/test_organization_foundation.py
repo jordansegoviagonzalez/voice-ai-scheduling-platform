@@ -5,7 +5,16 @@ from sqlalchemy import func, select
 
 from app.extensions import get_session_factory
 from app.models import Appointment, Call, ChatSession, Doctor, Location, Organization, RoutingDecision, Slot
+from app.seed.data import DEMO_ORGANIZATIONS
 from app.services.organization_context import DEFAULT_ORGANIZATION_SLUG
+
+
+def _login_admin(client: FlaskClient) -> None:
+    response = client.post(
+        "/api/auth/admin/login",
+        json={"email": "admin@example.com", "password": "admin123"},
+    )
+    assert response.status_code == 200, response.get_json()
 
 
 def test_seed_creates_default_organization_and_backfills_core_records(client: FlaskClient) -> None:
@@ -21,6 +30,22 @@ def test_seed_creates_default_organization_and_backfills_core_records(client: Fl
             assert total == scoped
     finally:
         session.close()
+
+
+def test_seeded_organizations_are_listed_with_directory_metadata(client: FlaskClient) -> None:
+    _login_admin(client)
+
+    response = client.get("/api/v1/organizations")
+
+    assert response.status_code == 200, response.get_json()
+    organizations = response.get_json()["organizations"]
+    organizations_by_slug = {organization["slug"]: organization for organization in organizations}
+    expected_slugs = {DEFAULT_ORGANIZATION_SLUG} | {organization["slug"] for organization in DEMO_ORGANIZATIONS}
+    assert expected_slugs.issubset(organizations_by_slug.keys())
+    assert organizations_by_slug[DEFAULT_ORGANIZATION_SLUG]["name"] == "Default Orthopedics"
+    assert organizations_by_slug[DEFAULT_ORGANIZATION_SLUG]["organization_type"] == "Orthopedics"
+    assert organizations_by_slug[DEFAULT_ORGANIZATION_SLUG]["doctor_count"] >= 1
+    assert organizations_by_slug["northside-dental-care"]["organization_type"] == "Dental"
 
 
 def test_default_organization_preserves_protocol_response(client: FlaskClient) -> None:

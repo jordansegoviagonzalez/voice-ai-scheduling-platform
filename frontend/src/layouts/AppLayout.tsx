@@ -1,5 +1,6 @@
 import {
   Activity,
+  Building2,
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 
 const navigation = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/organizations', label: 'Organizations', icon: Building2 },
   { to: '/calls', label: 'Calls', icon: ClipboardList },
   { to: '/appointments', label: 'Appointments', icon: CalendarDays },
   { to: '/physicians', label: 'Physicians', icon: Stethoscope },

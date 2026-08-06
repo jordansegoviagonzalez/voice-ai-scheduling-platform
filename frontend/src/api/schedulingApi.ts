@@ -4,6 +4,9 @@ import type {
   BookingConfirmation,
   Call,
   Doctor,
+  DoctorInput,
+  Organization,
+  OrganizationInput,
   OverviewResponse,
   ProtocolResponse,
   RoutingDecision,
@@ -12,6 +15,31 @@ import type {
 
 export const schedulingApi = {
   overview: () => apiRequest<OverviewResponse>('/dashboard/overview'),
+  organizations: () => apiRequest<{ organizations: Organization[] }>('/organizations'),
+  organization: (id: string | number) => apiRequest<{ organization: Organization }>(`/organizations/${id}`),
+  createOrganization: (body: OrganizationInput) =>
+    apiRequest<{ organization: Organization }>('/organizations', { method: 'POST', body: JSON.stringify(body) }),
+  updateOrganization: (id: string | number, body: Partial<OrganizationInput>) =>
+    apiRequest<{ organization: Organization }>(`/organizations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  resolveOrganizationBySlug: (slug: string) =>
+    apiRequest<{ organization: Organization }>(`/organizations/slug/${encodeURIComponent(slug)}`),
+  organizationDoctors: (organizationId: string | number) =>
+    apiRequest<{ doctors: Doctor[] }>(`/organizations/${organizationId}/doctors`),
+  organizationDoctor: (organizationId: string | number, doctorId: string | number) =>
+    apiRequest<{ doctor: Doctor }>(`/organizations/${organizationId}/doctors/${doctorId}`),
+  createOrganizationDoctor: (organizationId: string | number, body: DoctorInput) =>
+    apiRequest<{ doctor: Doctor }>(`/organizations/${organizationId}/doctors`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateOrganizationDoctor: (organizationId: string | number, doctorId: string | number, body: Partial<DoctorInput>) =>
+    apiRequest<{ doctor: Doctor }>(`/organizations/${organizationId}/doctors/${doctorId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
   calls: (query = '') => apiRequest<{ calls: Call[] }>(`/calls${query}`),
   call: (id: string | number) => apiRequest<{ call: Call }>(`/calls/${id}`),
   appointments: () => apiRequest<{ appointments: Appointment[] }>('/appointments'),

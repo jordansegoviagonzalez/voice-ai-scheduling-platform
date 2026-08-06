@@ -4,6 +4,7 @@ import { AppointmentsPage } from '../pages/AppointmentsPage';
 import { CallDetailPage } from '../pages/CallDetailPage';
 import { CallsPage } from '../pages/CallsPage';
 import { OverviewPage } from '../pages/OverviewPage';
+import { OrganizationsPage } from '../pages/OrganizationsPage';
 import { PhysiciansPage } from '../pages/PhysiciansPage';
 import { RoutingAuditPage } from '../pages/RoutingAuditPage';
 import { SimulatorPage } from '../pages/SimulatorPage';
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <OverviewPage /> },
+          { path: 'organizations', element: <OrganizationsPage /> },
           { path: 'calls', element: <CallsPage /> },
           { path: 'calls/:callId', element: <CallDetailPage /> },
           { path: 'appointments', element: <AppointmentsPage /> },
