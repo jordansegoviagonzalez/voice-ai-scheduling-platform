@@ -34,12 +34,12 @@ def _create_location(organization_id: int, code: str, name: str) -> int:
         session.close()
 
 
-def test_organization_can_be_created_with_generated_slug_and_listed(client: FlaskClient) -> None:
+def test_organization_can_be_created_without_slug_and_listed(client: FlaskClient) -> None:
     _login_admin(client)
 
-    created = _create_organization(client, "Summit Orthopedics")
+    created = _create_organization(client, "Lakeside Cardiology")
 
-    assert created["slug"] == "summit-orthopedics"
+    assert created["slug"] == "lakeside-cardiology"
     assert created["status"] == "ACTIVE"
     assert created["timezone"] == "America/Los_Angeles"
 

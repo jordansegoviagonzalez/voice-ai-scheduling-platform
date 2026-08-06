@@ -468,7 +468,7 @@ function OrganizationDetailsTab({ organization, doctorCount }: { organization: O
       <div className="organization-details-grid">
         <DetailItem label="Organization" value={organization.name} />
         <DetailItem label="Type" value={organizationType(organization)} />
-        <DetailItem label="Slug" value={organization.slug} />
+        <DetailItem label="Organization link name" value={organization.slug} />
         <DetailItem label="Status" value={organization.status} />
         <DetailItem label="Timezone" value={organization.timezone} />
         <DetailItem label="Doctor records" value={doctorCount} />
@@ -718,7 +718,6 @@ function OrganizationForm({
 }) {
   const prefix = mode === 'create' ? 'new-organization' : 'organization';
   const nameLabel = mode === 'create' ? 'New organization name' : 'Organization name';
-  const slugLabel = mode === 'create' ? 'New organization slug' : 'Organization slug';
   const timezoneLabel = mode === 'create' ? 'New organization timezone' : 'Organization timezone';
 
   return (
@@ -732,12 +731,20 @@ function OrganizationForm({
     >
       <label htmlFor={`${prefix}-name`}>
         {nameLabel}
-        <input id={`${prefix}-name`} name="name" defaultValue={organization?.name ?? ''} required maxLength={160} />
+        <input
+          id={`${prefix}-name`}
+          name="name"
+          defaultValue={organization?.name ?? ''}
+          required
+          maxLength={160}
+        />
       </label>
-      <label htmlFor={`${prefix}-slug`}>
-        {slugLabel}
-        <input id={`${prefix}-slug`} name="slug" defaultValue={organization?.slug ?? ''} maxLength={80} />
-      </label>
+      {mode === 'edit' ? (
+        <label htmlFor={`${prefix}-slug`} className="advanced-field">
+          Organization link name <span>advanced</span>
+          <input id={`${prefix}-slug`} name="slug" defaultValue={organization?.slug ?? ''} maxLength={80} />
+        </label>
+      ) : null}
       <label htmlFor={`${prefix}-timezone`}>
         {timezoneLabel}
         <input id={`${prefix}-timezone`} name="timezone" defaultValue={organization?.timezone ?? DEFAULT_TIMEZONE} required maxLength={64} />

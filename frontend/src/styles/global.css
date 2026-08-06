@@ -400,6 +400,13 @@ select, input { min-height: 40px; padding: 8px 10px; border: 1px solid #d9e0ec; 
   font-weight: 800;
 }
 
+.organization-form label.advanced-field span {
+  color: #7a869d;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .organization-form .button,
 .doctor-form .button {
   align-self: end;

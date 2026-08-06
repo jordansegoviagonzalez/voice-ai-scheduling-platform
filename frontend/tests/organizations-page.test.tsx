@@ -165,7 +165,9 @@ it('connects create and update organization and doctor flows to scoped API paths
 
   await userEvent.click(screen.getByRole('button', { name: 'New organization' }));
   await userEvent.type(screen.getByLabelText('New organization name'), 'Harbor Pediatrics');
-  await userEvent.type(screen.getByLabelText('New organization slug'), 'harbor-pediatrics');
+  expect(screen.queryByLabelText('New organization slug')).not.toBeInTheDocument();
+  expect(screen.queryByText('Organization link name preview')).not.toBeInTheDocument();
+  expect(screen.queryByText('Generated after name is entered')).not.toBeInTheDocument();
   await userEvent.click(screen.getAllByRole('button', { name: 'Create organization' })[0]);
 
   await waitFor(() => {
@@ -173,10 +175,15 @@ it('connects create and update organization and doctor flows to scoped API paths
       '/api/v1/organizations',
       expect.objectContaining({
         method: 'POST',
-        body: expect.stringContaining('"slug":"harbor-pediatrics"'),
+        body: expect.stringContaining('"name":"Harbor Pediatrics"'),
       }),
     );
   });
+  const createOrganizationCall = fetchMock.mock.calls.find(([path, init]) => {
+    return path === '/api/v1/organizations' && init?.method === 'POST';
+  });
+  expect(createOrganizationCall).toBeDefined();
+  expect(requestBody(createOrganizationCall?.[1])).not.toHaveProperty('slug');
 });
 
 it('keeps doctor rows scoped to the selected organization', async () => {
@@ -259,7 +266,7 @@ function createApiFetchMock({
       const body = requestBody(init);
       const created = {
         id: 30,
-        slug: String(body.slug),
+        slug: String(body.slug ?? previewSlug(String(body.name))),
         name: String(body.name),
         organization_type: 'Pediatrics',
         doctor_count: 0,
@@ -330,6 +337,18 @@ function createApiFetchMock({
 
 function requestBody(init?: RequestInit): Record<string, unknown> {
   return JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<string, unknown>;
+}
+
+function previewSlug(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80)
+    .replace(/-$/g, '');
 }
 
 function jsonResponse(body: unknown, status = 200) {
