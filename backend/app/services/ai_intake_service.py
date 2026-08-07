@@ -37,6 +37,8 @@ class AIIntakeService:
     def __init__(self, ai_client: OpenAIIntakeClient):
         self.ai_client = ai_client
 
+    from app.observability.langsmith_tracing import safe_traceable
+    @safe_traceable(name="GPT-5.2 Structured Intake")
     def process_message(
         self, session: ChatSession, recent_messages: list[dict[str, str]], latest_message: str
     ) -> IntakeProcessingResult:

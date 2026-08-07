@@ -4,6 +4,7 @@ import re
 from datetime import date
 
 from app.errors import ApiError
+from app.observability.langsmith_tracing import safe_traceable
 
 ORTHOPEDIC_BODY_PARTS = (
     "Knee",
@@ -317,6 +318,7 @@ def _build_date(year: int, month: int, day: int, field: str) -> date:
         ) from error
 
 
+@safe_traceable(name="Normalize Intake")
 def normalize_body_part(value: str) -> str:
     cleaned = _clean_category_text(value)
     for canonical, aliases in BODY_PARTS.items():
@@ -330,6 +332,7 @@ def normalize_body_part(value: str) -> str:
     )
 
 
+@safe_traceable(name="Normalize Intake")
 def normalize_issue_type(value: str) -> str:
     cleaned = _clean_category_text(value)
 

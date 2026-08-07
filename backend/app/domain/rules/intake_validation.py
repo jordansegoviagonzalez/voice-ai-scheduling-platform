@@ -10,6 +10,9 @@ LOCATIONS = {"MAIN", "EAST", "NORTH", "WEST", "SOUTH", "ANY"}
 TIME_OF_DAY_VALUES = {"morning", "afternoon", "any"}
 
 
+from app.observability.langsmith_tracing import safe_traceable
+
+@safe_traceable(name="Intake Validation")
 def validate_intake_fields(fields: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
     cleaned: dict[str, Any] = {}
     errors: dict[str, str] = {}

@@ -28,7 +28,8 @@ class SDKResponsesProvider:
                 "OPENAI_SDK_NOT_INSTALLED",
                 "The official OpenAI Python SDK is not installed.",
             ) from error
-        self.client = OpenAI(api_key=api_key, max_retries=max_retries)
+        from app.observability.langsmith_tracing import wrap_openai_if_enabled
+        self.client = wrap_openai_if_enabled(OpenAI(api_key=api_key, max_retries=max_retries))
 
     def create_intent_response(self, *, model: str, raw_user_text: str, timeout_seconds: float) -> Any:
         return self.client.responses.create(

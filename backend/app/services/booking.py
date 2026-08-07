@@ -16,6 +16,9 @@ class BookingService:
     def __init__(self, session: Session):
         self.session = session
 
+    from app.observability.langsmith_tracing import safe_traceable
+
+    @safe_traceable(name="Booking Decision")
     def book(
         self,
         *,

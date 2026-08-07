@@ -444,6 +444,11 @@ def test_run_benchmark(scenarios, app: Flask):
             else:
                 failed += 1
 
+        try:
+            from app.observability.langsmith_tracing import trace_benchmark_evaluation
+            trace_benchmark_evaluation(s, actual_action, is_pass)
+        except Exception:
+            pass
 
         # Update metrics exactly once per scenario using expected_raw
         results_by_action.setdefault(expected_raw, {"pass": 0, "fail": 0})

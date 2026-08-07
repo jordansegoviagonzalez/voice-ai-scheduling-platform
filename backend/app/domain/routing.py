@@ -47,6 +47,9 @@ class PhysicianRoutingService:
     def __init__(self, session: Session):
         self.session = session
 
+    from app.observability.langsmith_tracing import safe_traceable
+
+    @safe_traceable(name="Physician Routing")
     def recommend(self, request: RoutingRequest, *, persist: bool = True) -> dict[str, Any]:
         patient_status = request.patient_status.strip().upper()
         if patient_status not in {"NEW", "RETURNING"}:

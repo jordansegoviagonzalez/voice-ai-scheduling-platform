@@ -122,6 +122,8 @@ def vogent_routing(organization_slug: str | None = None):  # type: ignore[no-unt
     payload = json_body(request)
     require_fields(payload, "patient_status", "body_part", "issue_type")
 
+    from app.observability.langsmith_tracing import safe_traceable
+    @safe_traceable(name="Vogent Scheduling Flow")
     def handler(session, explicit_organization_id):  # type: ignore[no-untyped-def]
         call_id = int_or_none(payload.get("call_id"), "call_id")
         organization_id = call_organization_id(

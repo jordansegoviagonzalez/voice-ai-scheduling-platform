@@ -87,6 +87,9 @@ class ChatWorkflowService:
         msg = self.chat_service.ensure_welcome_message(chat_session, patient, "returning")
         return self._session_payload(chat_session, assistant_message=msg)
 
+    from app.observability.langsmith_tracing import safe_traceable
+
+    @safe_traceable(name="Chat Scheduling Flow")
     def handle_message(self, session_id: int, message: str) -> dict[str, Any]:
         if not isinstance(message, str) or not message.strip():
             raise ApiError("VALIDATION_ERROR", "Message is required.", 422, {"message": ["Required"]})

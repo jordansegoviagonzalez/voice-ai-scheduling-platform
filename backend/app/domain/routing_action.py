@@ -8,6 +8,9 @@ class RoutingAction(str, Enum):
     ESCALATE = "escalate"
     ROUTE_ADMIN = "route_admin"
 
+from app.observability.langsmith_tracing import safe_traceable
+
+@safe_traceable(name="Routing Action")
 def compute_routing_action(
     *,
     chat_status: str | None = None,

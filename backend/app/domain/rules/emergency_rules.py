@@ -14,6 +14,9 @@ EMERGENCY_KEYWORDS = [
 ]
 
 
+from app.observability.langsmith_tracing import safe_traceable
+
+@safe_traceable(name="Emergency Rule Check")
 def is_possible_emergency(message: str) -> bool:
     text = message.lower()
     return any(keyword in text for keyword in EMERGENCY_KEYWORDS)
