@@ -39,18 +39,13 @@ def validate_intake_fields(fields: dict[str, Any]) -> tuple[dict[str, Any], dict
         try:
             cleaned["body_part"] = normalize_body_part(str(cleaned["body_part"]))
         except Exception:
-            errors["body_part"] = (
-                "Choose knee, hip, shoulder, upper arm, elbow, forearm, hand/wrist, upper leg, lower leg, "
-                "foot/ankle, or spine."
-            )
+            errors["body_part"] = "Choose a supported capability area for this organization."
 
     if "issue_type" in cleaned:
         try:
             cleaned["issue_type"] = normalize_issue_type(str(cleaned["issue_type"]))
         except Exception:
-            errors["issue_type"] = (
-                "Clarify whether this is a fracture, joint replacement, sports injury, or general pain/consultation."
-            )
+            errors["issue_type"] = "Clarify the visit reason or issue type."
 
     if "severity" in fields:
         try:

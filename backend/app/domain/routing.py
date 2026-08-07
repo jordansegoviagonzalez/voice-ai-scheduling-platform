@@ -169,7 +169,7 @@ class PhysicianRoutingService:
                     doctor.id,
                     "ACCEPTED",
                     "VALID_CANDIDATE",
-                    f"{doctor.full_name} matches the requested orthopedic scheduling details.",
+                    f"{doctor.full_name} matches the requested scheduling details.",
                     context,
                 )
             )

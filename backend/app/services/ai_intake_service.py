@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.domain.chat.chat_types import ChatModelResponse
+from app.domain.normalization import BODY_PARTS, ORTHOPEDIC_BODY_PARTS
 from app.domain.rules.care_team_handoff_rules import HANDOFF_MESSAGE, requires_handoff
 from app.domain.rules.emergency_rules import EMERGENCY_MESSAGE, is_possible_emergency
 from app.domain.rules.intake_validation import validate_intake_fields
@@ -192,19 +193,8 @@ def _deterministic_fields_from_text(message: str) -> dict[str, Any]:
     elif {"both", "bilateral"} & tokens:
         fields["side"] = "bilateral"
 
-    body_aliases = {
-        "Knee": {"knee", "kneecap", "nee"},
-        "Hip": {"hip"},
-        "Shoulder": {"shoulder"},
-        "Upper Arm": {"upper arm"},
-        "Elbow": {"elbow"},
-        "Forearm": {"forearm"},
-        "Hand/Wrist": {"hand", "wrist"},
-        "Upper Leg": {"upper leg", "thigh"},
-        "Lower Leg": {"lower leg", "shin", "calf"},
-        "Foot/Ankle": {"foot", "ankle"},
-        "Spine": {"spine", "back", "neck"},
-    }
+    body_aliases = {body_part: set(aliases) for body_part, aliases in BODY_PARTS.items()}
+    body_aliases["Knee"].add("nee")
     for body_part, aliases in body_aliases.items():
         if aliases & tokens or any(
             " " in alias and re.search(rf"\b{re.escape(alias)}\b", cleaned) for alias in aliases
@@ -212,16 +202,31 @@ def _deterministic_fields_from_text(message: str) -> dict[str, Any]:
             fields["body_part"] = body_part
             break
 
+    non_orthopedic_area = fields.get("body_part") not in (None, *ORTHOPEDIC_BODY_PARTS)
     if {"sports", "athletic", "acl", "soccer", "basketball", "baseball"} & tokens:
         fields["issue_type"] = "Sports Medicine"
     elif {"fracture", "fractured", "broke", "broken"} & tokens:
         fields["issue_type"] = "Fracture"
     elif {"replacement", "arthroplasty"} & tokens:
         fields["issue_type"] = "Joint Replacement"
+    elif {"rash", "itching", "itchy"} & tokens:
+        fields["issue_type"] = "Rash/Itching"
+    elif {"infection", "infected"} & tokens:
+        fields["issue_type"] = "Infection"
+    elif {"numbness", "numb", "tingling"} & tokens:
+        fields["issue_type"] = "Numbness/Tingling"
+    elif {"breathing", "breath", "cough"} & tokens:
+        fields["issue_type"] = "Breathing Concern"
+    elif re.search(r"\bfollow[-\s]*up\b|\bfollowup\b", cleaned) and non_orthopedic_area:
+        fields["issue_type"] = "Follow-up"
+    elif "routine" in tokens and non_orthopedic_area:
+        fields["issue_type"] = "Routine Consult"
+    elif {"pain", "hurts", "hurt", "ache", "aches", "sore", "headache", "earache"} & tokens:
+        fields["issue_type"] = "Pain" if non_orthopedic_area else "General"
     elif {"pain", "consultation", "general"} & tokens:
         fields["issue_type"] = "General"
 
-    if re.search(r"\bfollow\s*up\b|\bfollowup\b", cleaned):
+    if re.search(r"\bfollow[-\s]*up\b|\bfollowup\b", cleaned):
         fields["appointment_type"] = "follow_up"
     elif re.search(r"\bpost\s*op\b|\bpostop\b", cleaned):
         fields["appointment_type"] = "post_op"

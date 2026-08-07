@@ -114,6 +114,12 @@ it('connects create and update organization and doctor flows to scoped API paths
 
   expect((await screen.findAllByText('Default Orthopedics')).length).toBeGreaterThan(0);
   expect(await screen.findByText('Dr. Iris Stone')).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Chat & Voice' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Chat & Voice at a glance')).not.toBeInTheDocument();
+  expect(screen.queryByText('Chat link placeholders')).not.toBeInTheDocument();
+  expect(screen.queryByText('Voice context placeholders')).not.toBeInTheDocument();
+  expect(screen.queryByText('Pending generation')).not.toBeInTheDocument();
+  expect(screen.queryByText('Pending mapping')).not.toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: 'Edit organization' }));
   await userEvent.clear(screen.getByLabelText('Organization name'));
@@ -134,6 +140,9 @@ it('connects create and update organization and doctor flows to scoped API paths
   await userEvent.click(screen.getByRole('button', { name: 'Add doctor' }));
   await userEvent.type(screen.getByLabelText('Doctor first name'), 'Mara');
   await userEvent.type(screen.getByLabelText('Doctor last name'), 'Hayes');
+  await userEvent.selectOptions(screen.getByLabelText('Capability area'), 'Heart/Circulation');
+  await userEvent.selectOptions(screen.getByLabelText('Visit reason / issue type'), 'Routine Consult');
+  expect(screen.getByRole('option', { name: 'Knee' })).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Create doctor' }));
 
   await waitFor(() => {
@@ -145,6 +154,14 @@ it('connects create and update organization and doctor flows to scoped API paths
       }),
     );
   });
+  const createDoctorCall = fetchMock.mock.calls.find(([path, init]) => {
+    return path === '/api/v1/organizations/1/doctors' && init?.method === 'POST';
+  });
+  expect(requestBody(createDoctorCall?.[1])).toEqual(
+    expect.objectContaining({
+      capabilities: [{ body_part: 'Heart/Circulation', issue_type: 'Routine Consult' }],
+    }),
+  );
 
   const irisRow = screen.getByText('Dr. Iris Stone').closest('tr');
   expect(irisRow).not.toBeNull();

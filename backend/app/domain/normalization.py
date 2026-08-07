@@ -5,6 +5,20 @@ from datetime import date
 
 from app.errors import ApiError
 
+ORTHOPEDIC_BODY_PARTS = (
+    "Knee",
+    "Hip",
+    "Shoulder",
+    "Upper Arm",
+    "Elbow",
+    "Forearm",
+    "Hand/Wrist",
+    "Upper Leg",
+    "Lower Leg",
+    "Foot/Ankle",
+    "Spine",
+)
+
 BODY_PARTS = {
     "Knee": {"knee", "kneecap"},
     "Hip": {"hip"},
@@ -17,9 +31,79 @@ BODY_PARTS = {
     "Lower Leg": {"lower leg", "shin", "calf"},
     "Foot/Ankle": {"foot", "ankle", "foot/ankle", "foot and ankle"},
     "Spine": {"spine", "back", "neck"},
+    "General": {"general", "general medicine", "general care"},
+    "Primary Care": {"primary care", "family medicine", "internal medicine", "pcp"},
+    "Heart/Circulation": {"heart", "cardiology", "cardiac", "circulation", "palpitations"},
+    "Lungs/Breathing": {"lungs", "lung", "pulmonology", "breathing", "shortness of breath", "cough"},
+    "Mouth/Teeth/Tongue": {
+        "mouth",
+        "tooth",
+        "teeth",
+        "tongue",
+        "gum",
+        "gums",
+        "dental",
+        "dentistry",
+    },
+    "Ear/Nose/Throat": {"ear", "ears", "earache", "nose", "throat", "sore throat", "sinus", "ent"},
+    "Eyes/Vision": {"eye", "eyes", "vision", "sight", "ophthalmology", "optometry"},
+    "Skin/Hair/Nails": {"skin", "hair", "nail", "nails", "dermatology", "rash", "itching", "skin spot"},
+    "Digestive/Abdomen": {
+        "stomach",
+        "abdomen",
+        "abdominal",
+        "digestive",
+        "gastroenterology",
+        "diarrhea",
+        "vomiting",
+    },
+    "Brain/Nerves": {"brain", "nerve", "nerves", "neurology", "headache", "dizziness", "numbness", "tingling"},
+    "Kidneys/Urinary": {"kidney", "kidneys", "urinary", "urine", "urology", "bladder"},
+    "Reproductive/Pelvic": {"obgyn", "ob/gyn", "gynecology", "reproductive", "pelvic", "pregnancy"},
+    "Pediatrics": {"pediatrics", "pediatric", "child", "children", "kid", "kids", "child wellness"},
+    "Diabetes/Thyroid": {"endocrine", "endocrinology", "diabetes", "thyroid"},
+    "Mental Health": {"mental health", "behavior", "behaviour", "anxiety", "depression"},
+    "Injury/Wounds": {"injury", "wound", "wounds", "cut", "laceration"},
+    "Bones/Joints/Muscles": {"bone", "bones", "joint", "joints", "muscle", "muscles", "orthopedics"},
 }
 
-ISSUE_TYPES = {"Fracture", "Joint Replacement", "Sports Medicine", "General"}
+CAPABILITY_AREA_LABELS = {
+    "Heart/Circulation": "Cardiology / Heart & Circulation",
+    "Lungs/Breathing": "Pulmonology / Lungs & Breathing",
+    "Mouth/Teeth/Tongue": "Dental / Mouth, Teeth & Tongue",
+    "Ear/Nose/Throat": "ENT / Ear, Nose & Throat",
+    "Eyes/Vision": "Eyes & Vision",
+    "Skin/Hair/Nails": "Dermatology / Skin, Hair & Nails",
+    "Digestive/Abdomen": "Gastroenterology / Digestive & Abdomen",
+    "Brain/Nerves": "Neurology / Brain & Nerves",
+    "Kidneys/Urinary": "Urology / Kidneys & Urinary",
+    "Reproductive/Pelvic": "OB/GYN / Reproductive & Pelvic",
+    "Diabetes/Thyroid": "Endocrine / Diabetes & Thyroid",
+    "Mental Health": "Mental Health & Behavior",
+    "Injury/Wounds": "Injury & Wounds",
+    "Bones/Joints/Muscles": "Bones / Joints / Muscles",
+}
+
+ISSUE_TYPES = (
+    "Fracture",
+    "Joint Replacement",
+    "Sports Medicine",
+    "General",
+    "Pain",
+    "Swelling",
+    "Injury",
+    "Bleeding",
+    "Rash/Itching",
+    "Infection",
+    "Numbness/Tingling",
+    "Weakness",
+    "Breathing Concern",
+    "Follow-up",
+    "Routine Consult",
+    "Preventive/Wellness",
+    "Medication/Refill",
+    "Lab/Test Result",
+)
 
 MONTHS = {
     "january": 1,
@@ -234,28 +318,53 @@ def _build_date(year: int, month: int, day: int, field: str) -> date:
 
 
 def normalize_body_part(value: str) -> str:
-    cleaned = re.sub(r"\s+", " ", value.strip().lower())
+    cleaned = _clean_category_text(value)
     for canonical, aliases in BODY_PARTS.items():
-        if cleaned in aliases:
+        if _matches_alias(cleaned, aliases):
             return canonical
     raise ApiError(
         "UNSUPPORTED_BODY_PART",
-        "The body part must be knee, hip, shoulder, upper arm, elbow, forearm, hand/wrist, upper leg, "
-        "lower leg, foot/ankle, or spine.",
+        "The capability area is not supported.",
         422,
-        {"body_part": ["Unsupported body part"]},
+        {"body_part": ["Unsupported capability area"]},
     )
 
 
 def normalize_issue_type(value: str) -> str:
-    cleaned = re.sub(r"[^a-z0-9\s/]", " ", value.lower())
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = _clean_category_text(value)
 
     exact = {
         "fracture": "Fracture",
         "joint replacement": "Joint Replacement",
         "sports medicine": "Sports Medicine",
         "general": "General",
+        "pain": "Pain",
+        "swelling": "Swelling",
+        "injury": "Injury",
+        "bleeding": "Bleeding",
+        "rash": "Rash/Itching",
+        "rash itching": "Rash/Itching",
+        "rash/itching": "Rash/Itching",
+        "itching": "Rash/Itching",
+        "infection": "Infection",
+        "numbness tingling": "Numbness/Tingling",
+        "numbness/tingling": "Numbness/Tingling",
+        "weakness": "Weakness",
+        "breathing concern": "Breathing Concern",
+        "follow up": "Follow-up",
+        "follow-up": "Follow-up",
+        "followup": "Follow-up",
+        "routine consult": "Routine Consult",
+        "routine consultation": "Routine Consult",
+        "preventive wellness": "Preventive/Wellness",
+        "preventive/wellness": "Preventive/Wellness",
+        "wellness": "Preventive/Wellness",
+        "medication refill": "Medication/Refill",
+        "medication/refill": "Medication/Refill",
+        "refill": "Medication/Refill",
+        "lab test result": "Lab/Test Result",
+        "lab/test result": "Lab/Test Result",
+        "test result": "Lab/Test Result",
     }
     if cleaned in exact:
         return exact[cleaned]
@@ -268,11 +377,52 @@ def normalize_issue_type(value: str) -> str:
         return "Joint Replacement"
     if {"acl", "sports", "soccer", "baseball", "basketball", "athletic"} & tokens:
         return "Sports Medicine"
-    if {"general", "pain", "consultation", "ongoing"} & tokens:
+    if "general" in tokens or "ongoing" in tokens:
+        return "General"
+    if {"bleeding", "blood"} & tokens:
+        return "Bleeding"
+    if {"rash", "itching", "itchy"} & tokens:
+        return "Rash/Itching"
+    if {"infection", "infected"} & tokens:
+        return "Infection"
+    if {"numbness", "numb", "tingling"} & tokens:
+        return "Numbness/Tingling"
+    if "weakness" in tokens:
+        return "Weakness"
+    if {"breathing", "breath", "cough"} & tokens:
+        return "Breathing Concern"
+    if {"followup"} & tokens or re.search(r"\bfollow[-\s]*up\b", cleaned):
+        return "Follow-up"
+    if "routine" in tokens and {"consult", "consultation", "visit"} & tokens:
+        return "Routine Consult"
+    if {"wellness", "preventive", "prevention"} & tokens:
+        return "Preventive/Wellness"
+    if {"medication", "refill", "prescription"} & tokens:
+        return "Medication/Refill"
+    if "lab" in tokens or re.search(r"\btest\s+result\b", cleaned):
+        return "Lab/Test Result"
+    if {"injury", "injured", "wound", "cut"} & tokens:
+        return "Injury"
+    if "swelling" in tokens or "swollen" in tokens:
+        return "Swelling"
+    if {"pain", "hurts", "hurt", "ache", "aches", "sore", "headache", "earache"} & tokens:
+        return "Pain"
+    if "consultation" in tokens or "consult" in tokens:
         return "General"
     raise ApiError(
         "ISSUE_TYPE_CLARIFICATION_REQUIRED",
-        "Please clarify whether this is a fracture, joint replacement, sports injury, or general pain/consultation.",
+        "Please clarify the visit reason or issue type.",
         422,
         {"issue_type": ["Issue type is uncertain"]},
     )
+
+
+def _clean_category_text(value: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9\s/+-]", " ", value.lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _matches_alias(cleaned: str, aliases: set[str]) -> bool:
+    if cleaned in aliases:
+        return True
+    return any(re.search(rf"\b{re.escape(alias)}\b", cleaned) for alias in aliases)

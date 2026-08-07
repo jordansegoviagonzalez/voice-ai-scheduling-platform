@@ -1,10 +1,15 @@
 EMERGENCY_KEYWORDS = [
     "chest pain",
+    "severe chest pain",
     "trouble breathing",
     "numbness down one arm",
     "sudden severe headache",
+    "stroke symptoms",
+    "stroke-like symptoms",
+    "fainting",
     "major trauma",
     "severe bleeding",
+    "severe allergic reaction",
     "loss of consciousness",
 ]
 

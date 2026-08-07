@@ -79,6 +79,19 @@ Any query that touches organization-owned data should include organization scope
 7. Cross-organization isolation tests.
 8. Documentation and final verification.
 
+## Capability Taxonomy Slice
+
+The doctor capability model currently stores scheduling categories in the existing `DoctorCapability.body_part` and `DoctorCapability.issue_type` fields. Those fields remain the compatibility contract for orthopedic routing, but the backend vocabulary can now include broader capability areas such as Heart/Circulation, Mouth/Teeth/Tongue, Skin/Hair/Nails, and Ear/Nose/Throat.
+
+This slice intentionally does not add a separate specialty or service-line column. A future model refinement can introduce a first-class service-line field if product reporting, credentialing, or provider directory requirements need it.
+
+Remaining benchmark work before claiming full multi-specialty Vogent coverage:
+
+- Resolve organization context on public routing and booking endpoints instead of relying on default-organization compatibility.
+- Add seeded non-orthopedic benchmark organizations, doctors, locations, and slots.
+- Run voice and web-chat scenarios for dental, cardiology, dermatology, pediatrics, no-match, and safety escalation paths.
+- Verify booking responses and dashboard records stay scoped to the selected organization across those scenarios.
+
 ## Definition of Done
 
 - At least two organizations can exist.

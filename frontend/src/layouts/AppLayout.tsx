@@ -2,11 +2,11 @@ import {
   Activity,
   Building2,
   CalendarDays,
-  ClipboardList,
   LayoutDashboard,
   Route,
   Stethoscope,
   MessageSquare,
+  PhoneCall,
   Users,
   LogOut
 } from 'lucide-react';
@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 const navigation = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/organizations', label: 'Organizations', icon: Building2 },
-  { to: '/calls', label: 'Calls', icon: ClipboardList },
+  { to: '/calls', label: 'Calls', icon: PhoneCall },
   { to: '/appointments', label: 'Appointments', icon: CalendarDays },
   { to: '/physicians', label: 'Physicians', icon: Stethoscope },
   { to: '/routing-audit', label: 'Routing Audit', icon: Route },

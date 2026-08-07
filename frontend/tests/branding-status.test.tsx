@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { AuthProvider } from '../src/context/AuthContext';
 import { AppLayout } from '../src/layouts/AppLayout';
 import { OverviewPage } from '../src/pages/OverviewPage';
+import { SignInPage } from '../src/pages/SignInPage';
 
 const overview = {
   metrics: { total_calls: 1, scheduled: 0, redirected: 0, abandoned: 0, failed: 0, in_progress: 1, conversion_rate: 0 },
@@ -56,8 +57,22 @@ it('uses the Voice AI Scheduling Platform product name', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
   render(<AuthProvider><MemoryRouter><AppLayout /></MemoryRouter></AuthProvider>);
   expect(screen.getByText('Voice AI Scheduling Platform')).toBeInTheDocument();
+  const callsLink = screen.getByRole('link', { name: 'Calls' });
+  expect(callsLink.querySelector('svg.lucide-phone-call')).not.toBeNull();
+  expect(callsLink.querySelector('svg.lucide-clipboard-list')).toBeNull();
   expect(screen.queryByText('Clinical Scheduling')).not.toBeInTheDocument();
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/auth/admin/session', { credentials: 'include' }));
+});
+
+it('uses multi-specialty landing page copy', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+  render(<AuthProvider><MemoryRouter initialEntries={['/sign-in?role=patient']}><SignInPage /></MemoryRouter></AuthProvider>);
+
+  expect(await screen.findByText('Multi-specialty scheduling')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Never miss a patient call again.' })).toBeInTheDocument();
+  expect(screen.queryByText('Provider-aware voice AI routing and secure appointment scheduling for multi-specialty care teams.')).not.toBeInTheDocument();
+  expect(screen.getByText('Synthetic demonstration data only')).toBeInTheDocument();
+  expect(screen.queryByText('Orthopedic scheduling')).not.toBeInTheDocument();
 });
 
 it('renders backend-derived provider readiness states', async () => {

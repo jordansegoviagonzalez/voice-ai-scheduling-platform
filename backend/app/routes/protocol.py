@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.domain.locations import location_sort_key
+from app.domain.normalization import BODY_PARTS, ISSUE_TYPES
 from app.errors import ApiError
 from app.extensions import get_session
 from app.models import Doctor, Location
@@ -63,19 +64,7 @@ def get_protocol():  # type: ignore[no-untyped-def]
         {
             "locations": [location_json(item) for item in locations],
             "doctors": [doctor_json(item) for item in doctors],
-            "body_parts": [
-                "Knee",
-                "Hip",
-                "Shoulder",
-                "Upper Arm",
-                "Elbow",
-                "Forearm",
-                "Hand/Wrist",
-                "Upper Leg",
-                "Lower Leg",
-                "Foot/Ankle",
-                "Spine",
-            ],
-            "issue_types": ["Fracture", "Joint Replacement", "Sports Medicine", "General"],
+            "body_parts": list(BODY_PARTS),
+            "issue_types": list(ISSUE_TYPES),
         }
     )

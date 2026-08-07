@@ -194,3 +194,38 @@ def test_doctor_location_must_belong_to_selected_organization(client: FlaskClien
 
     assert response.status_code == 404, response.get_json()
     assert response.get_json()["error"]["code"] == "LOCATION_NOT_FOUND"
+
+
+def test_doctor_capabilities_support_broader_service_lines(client: FlaskClient) -> None:
+    _login_admin(client)
+    organization = _create_organization(client, "Benchmark Specialty Group")
+    organization_id = int(organization["id"])
+
+    examples = [
+        ("Cara", "Pulse", "Heart/Circulation", "Routine Consult"),
+        ("Dina", "Mouth", "Mouth/Teeth/Tongue", "Pain"),
+        ("Sam", "Skin", "Skin/Hair/Nails", "Rash/Itching"),
+        ("Evan", "Throat", "Ear/Nose/Throat", "Pain"),
+    ]
+    created_doctor_ids: list[int] = []
+    for first_name, last_name, area, issue_type in examples:
+        response = client.post(
+            f"/api/v1/organizations/{organization_id}/doctors",
+            json={
+                "first_name": first_name,
+                "last_name": last_name,
+                "accepts_new_patients": True,
+                "capabilities": [{"body_part": area, "issue_type": issue_type}],
+            },
+        )
+        assert response.status_code == 201, response.get_json()
+        doctor = response.get_json()["doctor"]
+        created_doctor_ids.append(doctor["id"])
+        assert doctor["organization_id"] == organization_id
+        assert doctor["capabilities"] == [{"body_part": area, "issue_type": issue_type}]
+
+    listed = client.get(f"/api/v1/organizations/{organization_id}/doctors")
+    assert listed.status_code == 200, listed.get_json()
+    listed_by_id = {doctor["id"]: doctor for doctor in listed.get_json()["doctors"]}
+    assert set(created_doctor_ids).issubset(listed_by_id)
+    assert listed_by_id[created_doctor_ids[0]]["primary_specialty"] == "Cardiology / Heart & Circulation"

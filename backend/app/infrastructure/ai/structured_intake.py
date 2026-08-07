@@ -6,6 +6,7 @@ from typing import Any
 from openai import OpenAI
 
 from app.domain.chat.chat_types import ChatModelResponse
+from app.domain.normalization import BODY_PARTS, ISSUE_TYPES
 from app.integrations.openai.errors import OpenAIIntegrationError
 
 logger = logging.getLogger(__name__)
@@ -34,20 +35,7 @@ STRUCTURED_INTAKE_SCHEMA = {
                 "chief_complaint": {"type": ["string", "null"]},
                 "body_part": {
                     "type": ["string", "null"],
-                    "enum": [
-                        "Knee",
-                        "Hip",
-                        "Shoulder",
-                        "Upper Arm",
-                        "Elbow",
-                        "Forearm",
-                        "Hand/Wrist",
-                        "Upper Leg",
-                        "Lower Leg",
-                        "Foot/Ankle",
-                        "Spine",
-                        None,
-                    ],
+                    "enum": list(BODY_PARTS) + [None],
                 },
                 "side": {"type": ["string", "null"], "enum": ["left", "right", "bilateral", "not_applicable", None]},
                 "symptom_duration": {"type": ["string", "null"]},
@@ -58,7 +46,7 @@ STRUCTURED_INTAKE_SCHEMA = {
                 },
                 "issue_type": {
                     "type": ["string", "null"],
-                    "enum": ["Fracture", "Joint Replacement", "Sports Medicine", "General", None],
+                    "enum": list(ISSUE_TYPES) + [None],
                 },
                 "preferred_location": {
                     "type": ["string", "null"],

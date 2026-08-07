@@ -16,6 +16,10 @@ from app.errors import ApiError
         ("knee replacement consultation", "Joint Replacement"),
         ("ACL injury from soccer", "Sports Medicine"),
         ("general hip pain", "General"),
+        ("tooth pain", "Pain"),
+        ("rash and itching", "Rash/Itching"),
+        ("routine heart follow-up", "Follow-up"),
+        ("shortness of breath", "Breathing Concern"),
     ],
 )
 def test_issue_type_normalization(phrase: str, expected: str) -> None:
@@ -34,6 +38,31 @@ def test_body_part_aliases() -> None:
     assert normalize_body_part("elbow") == "Elbow"
     assert normalize_body_part("upper arm") == "Upper Arm"
     assert normalize_body_part("lower leg") == "Lower Leg"
+
+
+@pytest.mark.parametrize(
+    ("phrase", "expected"),
+    [
+        ("heart hurts", "Heart/Circulation"),
+        ("palpitations", "Heart/Circulation"),
+        ("routine heart follow-up", "Heart/Circulation"),
+        ("shortness of breath", "Lungs/Breathing"),
+        ("cough", "Lungs/Breathing"),
+        ("tongue hurts", "Mouth/Teeth/Tongue"),
+        ("tooth pain", "Mouth/Teeth/Tongue"),
+        ("earache", "Ear/Nose/Throat"),
+        ("sore throat", "Ear/Nose/Throat"),
+        ("rash", "Skin/Hair/Nails"),
+        ("stomach pain", "Digestive/Abdomen"),
+        ("abdominal pain", "Digestive/Abdomen"),
+        ("numbness and tingling", "Brain/Nerves"),
+        ("knee pain", "Knee"),
+        ("shoulder injury", "Shoulder"),
+        ("back pain", "Spine"),
+    ],
+)
+def test_broader_capability_area_symptom_normalization(phrase: str, expected: str) -> None:
+    assert normalize_body_part(phrase) == expected
 
 
 @pytest.mark.parametrize(

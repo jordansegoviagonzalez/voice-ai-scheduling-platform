@@ -178,15 +178,13 @@ export function SignInPage() {
             </div>
             <div>
               <strong>Voice AI Scheduling Platform</strong>
-              <span>Orthopedic scheduling</span>
+              <span>Multi-specialty scheduling</span>
             </div>
           </div>
 
           <h1>
-            The right appointment,
-            <span> routed with confidence.</span>
+            Never miss a patient call again.
           </h1>
-          <p>Physician protocol matching and secure appointment scheduling for patients and care teams.</p>
         </div>
 
         <div className="signin-security-note">

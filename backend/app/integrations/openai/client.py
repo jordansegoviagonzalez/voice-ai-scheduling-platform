@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any, Protocol
 
+from app.domain.normalization import ORTHOPEDIC_BODY_PARTS, normalize_body_part, normalize_issue_type
+from app.errors import ApiError
 from app.integrations.openai.errors import OpenAIIntegrationError
 from app.integrations.openai.prompts import SYSTEM_INSTRUCTIONS
 from app.integrations.openai.schema import (
@@ -48,11 +50,12 @@ class SDKResponsesProvider:
 class DeterministicTestProvider:
     def create_intent_response(self, *, model: str, raw_user_text: str, timeout_seconds: float) -> dict[str, Any]:
         lowered = raw_user_text.lower()
+        body_part = _match_body_part(lowered)
         return {
             "raw_user_text": raw_user_text,
             "patient_status": "RETURNING" if "returning" in lowered else "NEW" if "new" in lowered else "UNKNOWN",
-            "body_part": _match_body_part(lowered),
-            "issue_type": _match(lowered, ["Fracture", "Joint Replacement", "Sports Medicine", "General"]),
+            "body_part": body_part,
+            "issue_type": _match_issue_type(lowered, body_part),
             "preferred_doctor_name": None,
             "preferred_location_code": _match_location(lowered),
             "clarification_required": False,
@@ -206,35 +209,21 @@ def _collect_response_text(response: Any) -> str:
     return "".join(chunks)
 
 
-def _match(value: str, options: list[str]) -> str | None:
-    for option in options:
-        if option.lower() in value:
-            return option
-    if "broken" in value or "fracture" in value:
-        return "Fracture"
-    if "pain" in value:
-        return "General"
-    return None
-
-
 def _match_body_part(value: str) -> str | None:
-    body_aliases = {
-        "Knee": ("knee", "kneecap"),
-        "Hip": ("hip",),
-        "Shoulder": ("shoulder",),
-        "Upper Arm": ("upper arm",),
-        "Elbow": ("elbow",),
-        "Forearm": ("forearm",),
-        "Hand/Wrist": ("hand", "wrist", "hand/wrist", "hand and wrist"),
-        "Upper Leg": ("upper leg", "thigh"),
-        "Lower Leg": ("lower leg", "shin", "calf"),
-        "Foot/Ankle": ("foot", "ankle", "foot/ankle", "foot and ankle"),
-        "Spine": ("spine", "back", "neck"),
-    }
-    for canonical, aliases in body_aliases.items():
-        if any(alias in value for alias in aliases):
-            return canonical
-    return None
+    try:
+        return normalize_body_part(value)
+    except ApiError:
+        return None
+
+
+def _match_issue_type(value: str, body_part: str | None) -> str | None:
+    try:
+        issue_type = normalize_issue_type(value)
+    except ApiError:
+        return None
+    if issue_type == "Pain" and body_part in ORTHOPEDIC_BODY_PARTS:
+        return "General"
+    return issue_type
 
 
 def _match_location(value: str) -> str | None:

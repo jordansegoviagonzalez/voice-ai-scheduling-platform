@@ -8,14 +8,11 @@ import {
   Building2,
   ChevronRight,
   Filter,
-  Link2,
-  MessageSquare,
   Pencil,
   Plus,
   Search,
   Stethoscope,
   UsersRound,
-  Waves,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { schedulingApi } from '../api/schedulingApi';
@@ -26,7 +23,59 @@ import { StatusBadge } from '../components/StatusBadge';
 import type { Doctor, DoctorInput, Organization, OrganizationInput, OrganizationStatus } from '../types/api';
 
 const DEFAULT_TIMEZONE = 'America/Los_Angeles';
-const ORGANIZATION_TABS = ['Details', 'Doctors', 'Chat & Voice', 'Settings', 'Activity'] as const;
+const ORGANIZATION_TABS = ['Details', 'Doctors', 'Settings', 'Activity'] as const;
+const CAPABILITY_AREA_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'General', label: 'General' },
+  { value: 'Primary Care', label: 'Primary Care' },
+  { value: 'Heart/Circulation', label: 'Cardiology / Heart & Circulation' },
+  { value: 'Lungs/Breathing', label: 'Pulmonology / Lungs & Breathing' },
+  { value: 'Mouth/Teeth/Tongue', label: 'Dental / Mouth, Teeth & Tongue' },
+  { value: 'Ear/Nose/Throat', label: 'ENT / Ear, Nose & Throat' },
+  { value: 'Eyes/Vision', label: 'Eyes & Vision' },
+  { value: 'Skin/Hair/Nails', label: 'Dermatology / Skin, Hair & Nails' },
+  { value: 'Digestive/Abdomen', label: 'Gastroenterology / Digestive & Abdomen' },
+  { value: 'Brain/Nerves', label: 'Neurology / Brain & Nerves' },
+  { value: 'Kidneys/Urinary', label: 'Urology / Kidneys & Urinary' },
+  { value: 'Reproductive/Pelvic', label: 'OB/GYN / Reproductive & Pelvic' },
+  { value: 'Pediatrics', label: 'Pediatrics' },
+  { value: 'Diabetes/Thyroid', label: 'Endocrine / Diabetes & Thyroid' },
+  { value: 'Mental Health', label: 'Mental Health & Behavior' },
+  { value: 'Injury/Wounds', label: 'Injury & Wounds' },
+  { value: 'Bones/Joints/Muscles', label: 'Bones / Joints / Muscles' },
+  { value: 'Knee', label: 'Knee' },
+  { value: 'Hip', label: 'Hip' },
+  { value: 'Shoulder', label: 'Shoulder' },
+  { value: 'Upper Arm', label: 'Upper Arm' },
+  { value: 'Elbow', label: 'Elbow' },
+  { value: 'Forearm', label: 'Forearm' },
+  { value: 'Hand/Wrist', label: 'Hand/Wrist' },
+  { value: 'Upper Leg', label: 'Upper Leg' },
+  { value: 'Lower Leg', label: 'Lower Leg' },
+  { value: 'Foot/Ankle', label: 'Foot/Ankle' },
+  { value: 'Spine', label: 'Spine' },
+] as const;
+const VISIT_REASON_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'General', label: 'General' },
+  { value: 'Pain', label: 'Pain' },
+  { value: 'Swelling', label: 'Swelling' },
+  { value: 'Injury', label: 'Injury' },
+  { value: 'Fracture', label: 'Fracture' },
+  { value: 'Bleeding', label: 'Bleeding' },
+  { value: 'Rash/Itching', label: 'Rash / Itching' },
+  { value: 'Infection', label: 'Infection' },
+  { value: 'Numbness/Tingling', label: 'Numbness / Tingling' },
+  { value: 'Weakness', label: 'Weakness' },
+  { value: 'Breathing Concern', label: 'Breathing concern' },
+  { value: 'Follow-up', label: 'Follow-up' },
+  { value: 'Routine Consult', label: 'Routine consult' },
+  { value: 'Preventive/Wellness', label: 'Preventive / wellness' },
+  { value: 'Medication/Refill', label: 'Medication / refill' },
+  { value: 'Lab/Test Result', label: 'Lab / test result' },
+  { value: 'Sports Medicine', label: 'Sports Medicine' },
+  { value: 'Joint Replacement', label: 'Joint Replacement' },
+] as const;
 
 type OrganizationTab = (typeof ORGANIZATION_TABS)[number];
 type CreateOrganizationMutation = UseMutationResult<{ organization: Organization }, Error, OrganizationInput>;
@@ -180,7 +229,6 @@ export function OrganizationsPage() {
                 updateDoctor={updateDoctor}
                 onTabChange={setActiveTab}
               />
-              <ChatVoiceGlance organization={selectedOrganization} />
             </>
           ) : (
             <section className="panel organization-empty-panel">
@@ -200,7 +248,7 @@ function OrganizationsHeader({ onCreate }: { onCreate: () => void }) {
   return (
     <PageHeader
       title="Organizations"
-      subtitle="Create and manage client organizations, doctors, chat links, and voice context."
+      subtitle="Create and manage client organizations, doctors, and scheduling settings."
       actions={
         <button className="button primary" type="button" onClick={onCreate}>
           <Plus size={16} />
@@ -227,8 +275,6 @@ function OrganizationKpis({
       <MetricCard icon={<Building2 size={21} />} tone="blue" label="Total organizations" value={totalOrganizations} detail="All time" />
       <MetricCard icon={<UsersRound size={21} />} tone="green" label="Active organizations" value={activeOrganizations} detail={`${activePercent} of total`} />
       <MetricCard icon={<Stethoscope size={21} />} tone="violet" label="Total doctors" value={totalDoctors} detail="Across all organizations" />
-      <MetricCard icon={<MessageSquare size={21} />} tone="orange" label="Chat link placeholders" value={activeOrganizations} detail="Pending endpoint" />
-      <MetricCard icon={<Waves size={21} />} tone="teal" label="Voice context placeholders" value={activeOrganizations} detail="Pending mapping" />
     </section>
   );
 }
@@ -241,7 +287,7 @@ function MetricCard({
   detail,
 }: {
   icon: ReactNode;
-  tone: 'blue' | 'green' | 'violet' | 'orange' | 'teal';
+  tone: 'blue' | 'green' | 'violet';
   label: string;
   value: number;
   detail: string;
@@ -406,8 +452,6 @@ function SelectedOrganizationWorkspace({
         <SummaryTile label="Organization ID" value={organization.id} />
         <SummaryTile label="Timezone" value={organization.timezone} />
         <SummaryTile label="Doctors" value={doctorCount} />
-        <SummaryTile label="Chat link" value="Pending" tone="success" />
-        <SummaryTile label="Voice context" value="Pending" tone="success" />
       </dl>
       <div className="organization-tabs" role="tablist" aria-label="Organization sections">
         {ORGANIZATION_TABS.map((tab) => (
@@ -434,7 +478,6 @@ function SelectedOrganizationWorkspace({
           updateMutation={updateDoctor}
         />
       ) : null}
-      {activeTab === 'Chat & Voice' ? <ChatVoiceTab organization={organization} /> : null}
       {activeTab === 'Settings' ? (
         <OrganizationSettingsTab organization={organization} mutation={updateOrganization} />
       ) : null}
@@ -637,19 +680,6 @@ function DoctorsTab({
   );
 }
 
-function ChatVoiceTab({ organization }: { organization: Organization }) {
-  return (
-    <div className="organization-tab-panel">
-      <div className="organization-details-grid">
-        <DetailItem label="Chat link status" value="Pending generation" />
-        <DetailItem label="Chat organization" value={organization.slug} />
-        <DetailItem label="Voice context status" value="Pending mapping" />
-        <DetailItem label="Voice organization" value={organization.slug} />
-      </div>
-    </div>
-  );
-}
-
 function OrganizationSettingsTab({
   organization,
   mutation,
@@ -671,35 +701,6 @@ function OrganizationSettingsTab({
       />
       {mutation.isError ? <div className="alert-box error"><p>{mutation.error.message}</p></div> : null}
     </div>
-  );
-}
-
-function ChatVoiceGlance({ organization }: { organization: Organization }) {
-  return (
-    <section className="panel chat-voice-glance">
-      <div>
-        <h2>Chat & Voice at a glance</h2>
-        <p>Client-specific chat link and voice context for this organization.</p>
-      </div>
-      <div className="integration-tiles">
-        <div className="integration-tile">
-          <Link2 size={20} />
-          <span>
-            <strong>Chat link</strong>
-            <small>Pending generation for {organization.slug}</small>
-          </span>
-          <span className="placeholder-badge">Pending</span>
-        </div>
-        <div className="integration-tile">
-          <Waves size={20} />
-          <span>
-            <strong>Voice context</strong>
-            <small>Pending mapping for {organization.slug}</small>
-          </span>
-          <ChevronRight size={16} />
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -810,30 +811,19 @@ function DoctorForm({
         </select>
       </label>
       <label htmlFor={`${formId}-body-part`}>
-        Capability body part
+        Capability area
         <select id={`${formId}-body-part`} name="body_part" defaultValue={initialCapability?.body_part ?? ''}>
-          <option value="">None</option>
-          <option>Knee</option>
-          <option>Hip</option>
-          <option>Shoulder</option>
-          <option>Upper Arm</option>
-          <option>Elbow</option>
-          <option>Forearm</option>
-          <option>Hand/Wrist</option>
-          <option>Upper Leg</option>
-          <option>Lower Leg</option>
-          <option>Foot/Ankle</option>
-          <option>Spine</option>
+          {CAPABILITY_AREA_OPTIONS.map((option) => (
+            <option key={option.value || 'none'} value={option.value}>{option.label}</option>
+          ))}
         </select>
       </label>
       <label htmlFor={`${formId}-issue-type`}>
-        Capability issue type
+        Visit reason / issue type
         <select id={`${formId}-issue-type`} name="issue_type" defaultValue={initialCapability?.issue_type ?? ''}>
-          <option value="">None</option>
-          <option>Fracture</option>
-          <option>Joint Replacement</option>
-          <option>Sports Medicine</option>
-          <option>General</option>
+          {VISIT_REASON_OPTIONS.map((option) => (
+            <option key={option.value || 'none'} value={option.value}>{option.label}</option>
+          ))}
         </select>
       </label>
       <button className="button primary" type="submit" disabled={disabled}>{submitLabel}</button>
