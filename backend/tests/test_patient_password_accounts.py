@@ -406,6 +406,7 @@ def _create_patient(first_name: str, last_name: str, email: str, phone: str) -> 
     session = get_session_factory()()
     try:
         patient = Patient(
+            organization_id=1,
             first_name=first_name,
             last_name=last_name,
             date_of_birth=datetime(1990, 1, 1, tzinfo=UTC).date(),

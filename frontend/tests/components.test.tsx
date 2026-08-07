@@ -16,7 +16,7 @@ const doctor = {
   is_general_orthopedics: false,
   accepts_new_patients: true,
   active: true,
-  locations: [{ id: 1, organization_id: 1, code: 'MAIN', name: 'Main Campus' }],
+  locations: [{ id: 1, organization_id: 1, code: 'MAIN', name: 'Main Campus', address_line1: null, address_line2: null, city: null, state: null, postal_code: null }],
   capabilities: [{ body_part: 'Knee', issue_type: 'Fracture' }],
 };
 

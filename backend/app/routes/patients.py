@@ -22,7 +22,10 @@ def lookup_patient():  # type: ignore[no-untyped-def]
     require_fields(payload, "phone", "date_of_birth")
     phone = normalize_phone(bounded_string(payload, "phone", max_length=32) or "")
     dob = parse_date(bounded_string(payload, "date_of_birth", max_length=10) or "", "date_of_birth")
-    patient = get_session().scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
+
+    session = get_session()
+    organization_id = default_organization_id(session)
+    patient = session.scalar(select(Patient).where(Patient.organization_id == organization_id, Patient.phone == phone, Patient.date_of_birth == dob))
     if patient is None:
         return jsonify({"found": False, "patient": None})
     return jsonify({"found": True, "patient": patient_json(patient)})
@@ -33,16 +36,18 @@ def create_patient():  # type: ignore[no-untyped-def]
     payload = json_body(request)
     require_fields(payload, "first_name", "last_name", "phone", "date_of_birth")
     session = get_session()
+    organization_id = default_organization_id(session)
     first_name = bounded_string(payload, "first_name", max_length=100) or ""
     last_name = bounded_string(payload, "last_name", max_length=100) or ""
     phone = normalize_phone(bounded_string(payload, "phone", max_length=32) or "")
     dob = parse_date(bounded_string(payload, "date_of_birth", max_length=10) or "", "date_of_birth")
     email = bounded_string(payload, "email", max_length=255, required=False)
     insurance_provider = bounded_string(payload, "insurance_provider", max_length=255, required=False)
-    existing = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
+    existing = session.scalar(select(Patient).where(Patient.organization_id == organization_id, Patient.phone == phone, Patient.date_of_birth == dob))
     if existing:
         return jsonify({"created": False, "patient": patient_json(existing)}), 200
     patient = Patient(
+        organization_id=organization_id,
         first_name=first_name,
         last_name=last_name,
         phone=phone,

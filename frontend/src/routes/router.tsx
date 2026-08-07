@@ -30,6 +30,10 @@ export const router = createBrowserRouter([
     element: <ChatPage />,
   },
   {
+    path: '/chat/:orgSlug',
+    element: <ChatPage />,
+  },
+  {
     path: '/schedule',
     element: <ChatPage />,
   },

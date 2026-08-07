@@ -22,6 +22,8 @@ class PatientAccessService:
 
     def verify_returning_patient(
         self,
+        organization_id: int,
+        *,
         email: str | None = None,
         password: object = None,
         full_name: str | None = None,
@@ -35,7 +37,7 @@ class PatientAccessService:
                 normalized_email = normalize_email(email)
             except ApiError as error:
                 raise patient_login_error() from error
-            patient = self.session.scalar(select(Patient).where(Patient.email == normalized_email))
+            patient = self.session.scalar(select(Patient).where(Patient.organization_id == organization_id, Patient.email == normalized_email))
             if patient and verify_patient_password(patient.password_hash, password):
                 return patient
             raise patient_login_error()
@@ -45,7 +47,7 @@ class PatientAccessService:
                 normalized_phone = normalize_phone(phone)
             except ApiError as error:
                 raise patient_login_error() from error
-            patient = self.session.scalar(select(Patient).where(Patient.phone == normalized_phone))
+            patient = self.session.scalar(select(Patient).where(Patient.organization_id == organization_id, Patient.phone == normalized_phone))
             if patient:
                 return patient
             raise patient_login_error()
@@ -55,6 +57,7 @@ class PatientAccessService:
     def create_or_get_new_patient(
         self,
         *,
+        organization_id: int,
         full_name: str,
         date_of_birth: str,
         phone: str,
@@ -77,9 +80,9 @@ class PatientAccessService:
         validated_password = validate_new_account_password(password, password_confirmation)
         password_hash = hash_patient_password(validated_password)
         existing = self.session.scalar(
-            select(Patient).where(Patient.phone == normalized_phone, Patient.date_of_birth == dob)
+            select(Patient).where(Patient.organization_id == organization_id, Patient.phone == normalized_phone, Patient.date_of_birth == dob)
         )
-        email_owner = self.session.scalar(select(Patient).where(Patient.email == normalized_email))
+        email_owner = self.session.scalar(select(Patient).where(Patient.organization_id == organization_id, Patient.email == normalized_email))
         if email_owner is not None and (existing is None or email_owner.id != existing.id):
             raise ApiError(
                 "ACCOUNT_EMAIL_CONFLICT",
@@ -110,6 +113,7 @@ class PatientAccessService:
             return existing, False
 
         patient = Patient(
+            organization_id=organization_id,
             first_name=first_name,
             last_name=last_name,
             date_of_birth=dob,
@@ -124,7 +128,7 @@ class PatientAccessService:
         except IntegrityError as error:
             self.session.rollback()
             existing_after_conflict = self.session.scalar(
-                select(Patient).where(Patient.phone == normalized_phone, Patient.date_of_birth == dob)
+                select(Patient).where(Patient.organization_id == organization_id, Patient.phone == normalized_phone, Patient.date_of_birth == dob)
             )
             if existing_after_conflict:
                 return existing_after_conflict, False
@@ -139,7 +143,7 @@ class PatientAccessService:
         normalized_email = normalize_email(email)
         normalized_phone = normalize_phone(phone)
         email_owner = self.session.scalar(
-            select(Patient).where(Patient.email == normalized_email, Patient.id != patient.id)
+            select(Patient).where(Patient.organization_id == patient.organization_id, Patient.email == normalized_email, Patient.id != patient.id)
         )
         if email_owner is not None:
             raise ApiError(
@@ -150,6 +154,7 @@ class PatientAccessService:
             )
         identity_owner = self.session.scalar(
             select(Patient).where(
+                Patient.organization_id == patient.organization_id,
                 Patient.phone == normalized_phone,
                 Patient.date_of_birth == patient.date_of_birth,
                 Patient.id != patient.id,

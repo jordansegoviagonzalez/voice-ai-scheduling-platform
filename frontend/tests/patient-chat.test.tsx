@@ -299,6 +299,51 @@ it('handles varying recommendation payload shapes safely', async () => {
   expect(screen.getByText('Clinic 2')).toBeInTheDocument();
 });
 
+it('renders the chat route with an organization slug and uses scoped APIs', async () => {
+  localStorage.setItem('patientChatSessionId', '42');
+  mockChatFetch({
+    '/api/chat/organizations/lakeside-cardiology/sessions/42': collectingSession,
+    '/api/patient/profile': { patient: patientProfile }
+  });
+
+  render(
+    <MemoryRouter initialEntries={['/chat/lakeside-cardiology']}>
+      <Routes>
+        <Route path="/chat/:orgSlug" element={<ChatPage />} />
+      </Routes>
+    </MemoryRouter>
+  );
+
+  expect(await screen.findByRole('heading', { name: /Appointment intake/i })).toBeInTheDocument();
+  expect(screen.getByText(collectingSession.messages[0].content)).toBeInTheDocument();
+
+  // Verify it doesn't render admin sidebar by checking page structure
+  expect(screen.queryByRole('navigation', { name: /admin/i })).not.toBeInTheDocument();
+});
+
+it('shows a clean error state when navigating to an invalid organization slug', async () => {
+  localStorage.removeItem('patientChatSessionId');
+  mockChatFetch({
+    '/api/v1/organizations/slug/invalid-clinic': {
+      status: 404,
+      body: { error: { message: 'Organization not found' } }
+    }
+  });
+
+  render(
+    <MemoryRouter initialEntries={['/chat/invalid-clinic']}>
+      <Routes>
+        <Route path="/chat/:orgSlug" element={<ChatPage />} />
+        <Route path="/sign-in" element={<div>Sign in route</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+
+  expect(await screen.findByText('Organization not found')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /unavailable/i })).toBeInTheDocument();
+  expect(screen.queryByText('Sign in route')).not.toBeInTheDocument();
+});
+
 function renderChatRoutes(initialPath: string) {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
@@ -317,6 +362,9 @@ function mockChatFetch(routes: Record<string, unknown>) {
     vi.fn((input: RequestInfo | URL) => {
       const path = String(input);
       const payload = routes[path];
+      if (payload && isMockFailure(payload)) {
+        return jsonResponse(payload.body, false, payload.status);
+      }
       if (payload) return jsonResponse(payload);
       return jsonResponse({}, false, 404);
     }),
@@ -325,4 +373,8 @@ function mockChatFetch(routes: Record<string, unknown>) {
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return Promise.resolve({ ok, status, json: async () => body });
+}
+
+function isMockFailure(value: unknown): value is { status: number; body: unknown } {
+  return typeof value === 'object' && value !== null && 'status' in value && 'body' in value;
 }

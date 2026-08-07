@@ -3,14 +3,15 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from datetime import UTC, date, datetime, timedelta
 
 from flask import Flask
 from flask.testing import FlaskClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.extensions import get_session_factory
 from app.integrations.vogent import security
-from app.models import Appointment, Call
+from app.models import Appointment, Call, Doctor, DoctorLocation, Location, Organization, Patient, Slot
 
 
 def _signed_post(client: FlaskClient, *, payload: dict[str, object], secret: str):  # type: ignore[no-untyped-def]
@@ -265,6 +266,16 @@ def test_vogent_duplicate_booking_returns_stored_result(app: Flask, client: Flas
     assert duplicate.status_code == 201, duplicate.get_json()
     assert duplicate.get_json() == first.get_json()
 
+    # Assert location address fields are included in confirmation
+    confirmed_data = confirmed.get_json()
+    assert "address_line1" in confirmed_data
+    assert "city" in confirmed_data
+
+    # Assert location address fields are included in booking
+    booking_data = first.get_json()
+    assert "address_line1" in booking_data
+    assert "city" in booking_data
+
     session = get_session_factory()()
     count = session.scalar(select(func.count(Appointment.id)).where(Appointment.slot_id == slot_id))
     session.close()
@@ -289,3 +300,82 @@ def test_vogent_patient_lookup_rejects_unparseable_dob(client: FlaskClient) -> N
     body = response.get_json()
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert body["error"]["message"] == "date_of_birth could not be parsed."
+
+
+def test_vogent_invalid_org_slug_fails_loudly_without_fallback(client: FlaskClient) -> None:
+    response = client.post(
+        "/api/v1/organizations/slug/does-not-exist/vogent/functions/patient-lookup",
+        json={"phone": "555-0101", "date_of_birth": "1990-01-01"},
+    )
+    assert response.status_code == 404
+    payload = response.get_json()
+    assert payload["error"]["code"] == "ORGANIZATION_NOT_FOUND"
+    serialized = json.dumps(payload)
+    assert "default-orthopedics" not in serialized
+    assert "client_links" not in serialized
+    assert "voice" not in serialized
+
+
+def test_vogent_wrong_org_slot_booking_fails(app: Flask, client: FlaskClient) -> None:
+    with app.app_context():
+        session = get_session_factory()()
+        org1 = session.scalar(text("SELECT id FROM organizations WHERE slug = 'default-orthopedics'"))
+        org2 = Organization(
+            name="Other Org",
+            slug="other-org",
+            status="ACTIVE",
+            timezone="America/Los_Angeles",
+            business_hours={"monday": [{"open": "08:00", "close": "17:00"}]},
+        )
+        session.add(org2)
+        session.flush()
+        doc2 = Doctor(
+            organization_id=org2.id,
+            first_name="Other",
+            last_name="Doc",
+            accepts_new_patients=True,
+            active=True,
+        )
+        loc2 = Location(organization_id=org2.id, name="Other Clinic", code="OTHER")
+        session.add_all([doc2, loc2])
+        session.flush()
+        session.add(DoctorLocation(doctor_id=doc2.id, location_id=loc2.id))
+
+        tomorrow = datetime.now(UTC).replace(hour=10, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        if tomorrow.weekday() > 4:
+            tomorrow += timedelta(days=2)
+
+        slot2 = Slot(
+            organization_id=org2.id,
+            doctor_id=doc2.id,
+            location_id=loc2.id,
+            starts_at=tomorrow,
+            ends_at=tomorrow + timedelta(minutes=30),
+            status="OPEN",
+        )
+        pat1 = Patient(
+            organization_id=org1,
+            first_name="Pat",
+            last_name="One",
+            date_of_birth=date(1990, 1, 1),
+            phone="5550101",
+        )
+        session.add_all([slot2, pat1])
+        session.commit()
+
+        slot2_id = slot2.id
+        pat1_id = pat1.id
+        session.close()
+
+    response = client.post(
+        "/api/v1/organizations/slug/default-orthopedics/vogent/functions/book-appointment",
+        json={
+            "patient_id": pat1_id,
+            "slot_id": slot2_id,
+            "body_part": "knee",
+            "issue_type": "pain",
+            "confirmation_token": "token123",
+        },
+    )
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "ORGANIZATION_CONTEXT_MISMATCH"

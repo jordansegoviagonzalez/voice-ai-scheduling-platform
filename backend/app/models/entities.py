@@ -32,6 +32,9 @@ class Organization(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="America/Los_Angeles")
+    business_hours: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    voice_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    voice_phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     locations: Mapped[list[Location]] = relationship(back_populates="organization")
     doctors: Mapped[list[Doctor]] = relationship(back_populates="organization")
@@ -39,16 +42,18 @@ class Organization(Base, TimestampMixin):
     appointments: Mapped[list[Appointment]] = relationship(back_populates="organization")
     calls: Mapped[list[Call]] = relationship(back_populates="organization")
     routing_decisions: Mapped[list[RoutingDecision]] = relationship(back_populates="organization")
+    patients: Mapped[list[Patient]] = relationship(back_populates="organization")
 
 
 class Patient(Base, TimestampMixin):
     __tablename__ = "patients"
     __table_args__ = (
-        UniqueConstraint("phone", "date_of_birth", name="uq_patient_identity"),
-        Index("ix_patients_email_unique", "email", unique=True),
+        UniqueConstraint("organization_id", "phone", "date_of_birth", name="uq_patient_identity"),
+        Index("ix_patients_org_email_unique", "organization_id", "email", unique=True),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
@@ -59,6 +64,7 @@ class Patient(Base, TimestampMixin):
 
     appointments: Mapped[list[Appointment]] = relationship(back_populates="patient")
     doctor_history: Mapped[list[PatientDoctorHistory]] = relationship(back_populates="patient")
+    organization: Mapped[Organization] = relationship(back_populates="patients")
 
     @property
     def full_name(self) -> str:
@@ -77,6 +83,11 @@ class Location(Base):
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
     code: Mapped[str] = mapped_column(String(16), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    address_line1: Mapped[str | None] = mapped_column(String(100))
+    address_line2: Mapped[str | None] = mapped_column(String(100))
+    city: Mapped[str | None] = mapped_column(String(100))
+    state: Mapped[str | None] = mapped_column(String(50))
+    postal_code: Mapped[str | None] = mapped_column(String(20))
 
     organization: Mapped[Organization] = relationship(back_populates="locations")
     doctors: Mapped[list[Doctor]] = relationship(secondary="doctor_locations", back_populates="locations")

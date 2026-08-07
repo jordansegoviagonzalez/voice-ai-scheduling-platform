@@ -16,6 +16,7 @@ const defaultOrganization: Organization = {
   doctor_count: 1,
   status: 'ACTIVE',
   timezone: 'America/Los_Angeles',
+  business_hours: {},
   active: true,
   created_at: '2026-08-06T10:00:00Z',
   updated_at: '2026-08-06T10:00:00Z',
@@ -29,7 +30,14 @@ const northsideOrganization: Organization = {
   doctor_count: 1,
   status: 'ACTIVE',
   timezone: 'America/Los_Angeles',
+  business_hours: {},
   active: true,
+  client_links: {
+    chat_path: '/chat/northside-dental-care',
+    vogent_webhook_path: '/api/v1/organizations/slug/northside-dental-care/vogent/webhooks',
+    vogent_function_base_path: '/api/v1/organizations/slug/northside-dental-care/vogent/functions',
+  },
+  voice: { enabled: false, phone_number: null, status: 'unconfigured' },
   created_at: '2026-08-06T10:00:00Z',
   updated_at: '2026-08-06T10:00:00Z',
 };
@@ -44,7 +52,7 @@ const defaultDoctor: Doctor = {
   is_general_orthopedics: false,
   accepts_new_patients: true,
   active: true,
-  locations: [{ id: 100, organization_id: 1, code: 'MAIN', name: 'Main Campus' }],
+  locations: [{ id: 100, organization_id: 1, code: 'MAIN', name: 'Main Campus', address_line1: null, address_line2: null, city: null, state: null, postal_code: null }],
   capabilities: [{ body_part: 'Knee', issue_type: 'General' }],
 };
 
@@ -58,7 +66,7 @@ const northsideDoctor: Doctor = {
   is_general_orthopedics: false,
   accepts_new_patients: true,
   active: true,
-  locations: [{ id: 200, organization_id: 2, code: 'DENTAL', name: 'Northside Office' }],
+  locations: [{ id: 200, organization_id: 2, code: 'DENTAL', name: 'Northside Office', address_line1: null, address_line2: null, city: null, state: null, postal_code: null }],
   capabilities: [{ body_part: 'Jaw', issue_type: 'General' }],
 };
 
@@ -222,6 +230,125 @@ it('keeps doctor rows scoped to the selected organization', async () => {
   expect(screen.queryByText('Dr. Iris Stone')).not.toBeInTheDocument();
 });
 
+it('connects location creation to scoped API paths', async () => {
+  const fetchMock = createApiFetchMock();
+  vi.stubGlobal('fetch', fetchMock);
+  renderOrganizationsRoute();
+
+  expect((await screen.findAllByText('Default Orthopedics')).length).toBeGreaterThan(0);
+
+  await userEvent.click(screen.getByRole('tab', { name: 'Locations' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add location' }));
+  await userEvent.type(screen.getByLabelText('Location code (e.g. CLINIC-1)'), 'TEST-1');
+  await userEvent.type(screen.getByLabelText('Location name'), 'Test Clinic');
+  await userEvent.click(screen.getByRole('button', { name: 'Create location' }));
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/organizations/1/locations',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"code":"TEST-1"'),
+      }),
+    );
+  });
+});
+
+it('displays the client-specific links to chat with or call the AI and handles switching', async () => {
+  const lakesideOrganization: Organization = {
+    ...defaultOrganization,
+    id: 10,
+    name: 'Lakeside Cardiology',
+    slug: 'lakeside-cardiology',
+    client_links: {
+      chat_path: '/chat/lakeside-cardiology',
+      vogent_webhook_path: '/api/v1/organizations/slug/lakeside-cardiology/vogent/webhooks',
+      vogent_function_base_path: '/api/v1/organizations/slug/lakeside-cardiology/vogent/functions',
+    },
+    voice: { enabled: false, phone_number: null, status: 'unconfigured' },
+  };
+  const fetchMock = createApiFetchMock({ organizations: [lakesideOrganization, northsideOrganization] });
+  vi.stubGlobal('fetch', fetchMock);
+  renderOrganizationsRoute();
+
+  // Select Lakeside Cardiology
+  const lakesideButton = await screen.findByRole('button', { name: /Lakeside Cardiology/ });
+  await userEvent.click(lakesideButton);
+
+  // Switch to Details tab
+  await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+
+  // Assert section title
+  expect(await screen.findByText('Client-specific links to chat with or call the AI')).toBeInTheDocument();
+
+  // Assert old heading is gone
+  expect(screen.queryByText('Client-specific public chat link')).not.toBeInTheDocument();
+
+  // Assert Lakeside Chat block
+  expect(await screen.findByText('Chat AI Receptionist')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /chat\/lakeside-cardiology/ })).toHaveAttribute('href', expect.stringContaining('/chat/lakeside-cardiology'));
+
+  // Assert Lakeside Voice block
+  expect(await screen.findByText('Voice AI Receptionist')).toBeInTheDocument();
+  expect(await screen.findByText('Voice number not configured yet')).toBeInTheDocument();
+
+  // Assert Lakeside Vogent paths
+  expect(screen.getByTestId('vogent-webhook-path')).toHaveTextContent('/api/v1/organizations/slug/lakeside-cardiology/vogent/webhooks');
+  expect(screen.getByTestId('vogent-function-path')).toHaveTextContent('/api/v1/organizations/slug/lakeside-cardiology/vogent/functions');
+
+  // Switch to Northside Dental Care
+  const northsideButton = await screen.findByRole('button', { name: /Northside Dental Care/ });
+  await userEvent.click(northsideButton);
+
+  // Switch to Details tab for Northside
+  await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+
+  // Assert Northside Chat link
+  expect(screen.getByRole('link', { name: /chat\/northside-dental-care/ })).toHaveAttribute('href', expect.stringContaining('/chat/northside-dental-care'));
+
+  // Assert Northside Vogent paths
+  expect(screen.getByTestId('vogent-webhook-path')).toHaveTextContent('/api/v1/organizations/slug/northside-dental-care/vogent/webhooks');
+  expect(screen.getByTestId('vogent-function-path')).toHaveTextContent('/api/v1/organizations/slug/northside-dental-care/vogent/functions');
+
+  // Assert stale Lakeside links are no longer present
+  expect(screen.queryByRole('link', { name: /chat\/lakeside-cardiology/ })).not.toBeInTheDocument();
+  expect(screen.queryByText('/api/v1/organizations/slug/lakeside-cardiology/vogent/webhooks')).not.toBeInTheDocument();
+  expect(screen.queryByText('/api/v1/organizations/slug/lakeside-cardiology/vogent/functions')).not.toBeInTheDocument();
+});
+
+it('displays the client-specific public chat link and business hours', async () => {
+  const fetchMock = createApiFetchMock();
+  vi.stubGlobal('fetch', fetchMock);
+  renderOrganizationsRoute();
+
+  expect((await screen.findAllByText('Default Orthopedics')).length).toBeGreaterThan(0);
+
+  // Switch to Details tab
+  await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+
+  // Organization Details Tab should show the link
+  expect(await screen.findByText('Client-specific links to chat with or call the AI')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /chat\/default-orthopedics/ })).toHaveAttribute('href', expect.stringContaining('/chat/default-orthopedics'));
+
+  // Should show No business hours
+  expect(await screen.findByText('No business hours configured.')).toBeInTheDocument();
+
+  // Switch to Settings to add hours
+  await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+  await userEvent.type(screen.getByLabelText('Monday'), '9-5');
+  await userEvent.click(screen.getByRole('button', { name: 'Save organization' }));
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/organizations/1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.stringContaining('"Monday":"9-5"'),
+      }),
+    );
+  });
+});
+
 it('shows loading, empty, and API error states', async () => {
   vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)));
   const { unmount } = renderOrganizationsRoute();
@@ -289,6 +416,7 @@ function createApiFetchMock({
         doctor_count: 0,
         status: 'ACTIVE',
         timezone: String(body.timezone ?? 'America/Los_Angeles'),
+        business_hours: {},
         active: true,
       } satisfies Organization;
       organizationState = [...organizationState, created];
@@ -346,6 +474,16 @@ function createApiFetchMock({
       });
       doctorState.set(organizationId, updatedDoctors);
       return jsonResponse({ doctor: updatedDoctors.find((doctor) => doctor.id === doctorId) });
+    }
+
+    const locationListMatch = path.match(/^\/api\/v1\/organizations\/(\d+)\/locations$/);
+    if (locationListMatch && method === 'GET') {
+      return jsonResponse({ locations: [] });
+    }
+
+    if (locationListMatch && method === 'POST') {
+      const body = requestBody(init);
+      return jsonResponse({ location: { id: 100, organization_id: Number(locationListMatch[1]), code: body.code, name: body.name } }, 201);
     }
 
     return jsonResponse({ error: { message: `Unhandled ${method} ${path}` } }, 500);

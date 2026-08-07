@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   CalendarDays,
   CheckCircle2,
@@ -105,6 +105,7 @@ const workflowSteps = [
 export function ChatPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { orgSlug } = useParams<{ orgSlug?: string }>();
   const routeState = location.state as ChatRouteState | null;
   const routeSessionId = routeState?.sessionId;
   const storedSessionId = Number(localStorage.getItem(sessionKey));
@@ -128,6 +129,8 @@ export function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
   const progressTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const [orgPrecheck, setOrgPrecheck] = useState(Boolean(orgSlug && !sessionId));
 
   const applySession = useCallback((data: ChatSessionResponse) => {
     // Normalize recommendations to canonical shape: locations[].available_slots[]
@@ -223,9 +226,23 @@ export function ChatPage() {
   );
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      if (orgSlug) {
+        // Pre-validate org slug before redirecting to sign-in
+        apiRequestAbsolute(`/api/v1/organizations/slug/${orgSlug}`)
+          .then(() => setOrgPrecheck(false))
+          .catch((err) => {
+            setError(err instanceof Error ? err.message : 'This clinic link is invalid or inactive.');
+          });
+      }
+      return;
+    }
     localStorage.setItem(sessionKey, String(sessionId));
-    Promise.all([apiRequestAbsolute<ChatSessionResponse>(`/api/chat/sessions/${sessionId}`), getPatientProfile()])
+    const sessionUrl = orgSlug
+      ? `/api/chat/organizations/${orgSlug}/sessions/${sessionId}`
+      : `/api/chat/sessions/${sessionId}`;
+
+    Promise.all([apiRequestAbsolute<ChatSessionResponse>(sessionUrl), getPatientProfile()])
       .then(([sessionData, profileData]) => {
         applySession(sessionData);
         setProfile(profileData.patient);
@@ -235,7 +252,7 @@ export function ChatPage() {
         setError(err instanceof Error ? err.message : 'The chat session could not be restored.');
       })
       .finally(() => setLoading(false));
-  }, [applySession, handleUnauthorized, sessionId]);
+  }, [applySession, handleUnauthorized, sessionId, orgSlug]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' });
@@ -279,7 +296,30 @@ export function ChatPage() {
   const hasSidebarContent = Boolean((error && !booking) || selectedSlot || recommendations.length > 0 || (!booking && !sessionClosed));
 
   if (!sessionId) {
-    return <Navigate to="/sign-in?role=patient" replace />;
+    if (orgPrecheck && !error) {
+      return (
+        <main className="patient-chat-page">
+          <section className="patient-chat-shell">
+            <div className="chat-loading" role="status" aria-live="polite">
+              Verifying clinic link...
+            </div>
+          </section>
+        </main>
+      );
+    }
+    if (error) {
+      return (
+        <main className="patient-chat-page">
+          <section className="patient-chat-shell">
+            <div role="alert" className="chat-alert" style={{ margin: '2rem', textAlign: 'center' }}>
+              <h2>Unavailable</h2>
+              <p>{error}</p>
+            </div>
+          </section>
+        </main>
+      );
+    }
+    return <Navigate to={`/sign-in?role=patient${orgSlug ? `&org=${orgSlug}` : ''}`} replace />;
   }
 
   const sendMessage = async (event: FormEvent) => {
@@ -292,7 +332,10 @@ export function ChatPage() {
     setSubmitting(true);
     setMessages((previous) => [...previous, { role: 'patient', content: message }]);
     try {
-      const data = await apiRequestAbsolute<ChatSessionResponse>(`/api/chat/sessions/${sessionId}/messages`, {
+      const msgUrl = orgSlug
+        ? `/api/chat/organizations/${orgSlug}/sessions/${sessionId}/messages`
+        : `/api/chat/sessions/${sessionId}/messages`;
+      const data = await apiRequestAbsolute<ChatSessionResponse>(msgUrl, {
         method: 'POST',
         body: JSON.stringify({ message }),
       });
@@ -318,7 +361,10 @@ export function ChatPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const data = await apiRequestAbsolute<ChatSessionResponse>(`/api/chat/sessions/${sessionId}/appointments/select`, {
+      const selectUrl = orgSlug
+        ? `/api/chat/organizations/${orgSlug}/sessions/${sessionId}/appointments/select`
+        : `/api/chat/sessions/${sessionId}/appointments/select`;
+      const data = await apiRequestAbsolute<ChatSessionResponse>(selectUrl, {
         method: 'POST',
         body: JSON.stringify({ slotId: slot.id }),
       });
@@ -338,7 +384,10 @@ export function ChatPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const data = await apiRequestAbsolute<ChatSessionResponse>(`/api/chat/sessions/${sessionId}/appointments/confirm`, {
+      const confirmUrl = orgSlug
+        ? `/api/chat/organizations/${orgSlug}/sessions/${sessionId}/appointments/confirm`
+        : `/api/chat/sessions/${sessionId}/appointments/confirm`;
+      const data = await apiRequestAbsolute<ChatSessionResponse>(confirmUrl, {
         method: 'POST',
       });
       applySession(data);
@@ -373,7 +422,7 @@ export function ChatPage() {
         <header className="patient-chat-header">
           <div>
             <p className="patient-chat-kicker">Patient scheduling</p>
-            <h1>Orthopedic appointment intake</h1>
+            <h1>Appointment intake</h1>
           </div>
           <div className="patient-chat-actions">
             <div className="workflow-menu" ref={progressRef}>
@@ -525,7 +574,7 @@ export function ChatPage() {
                         {recommendation.locations.map((loc) => (
                           <div key={loc.clinic_location_code} className="recommendation-location-group">
                             <h4 className="recommendation-location-title">
-                              <MapPin size={16} aria-hidden /> {loc.clinic_location} 
+                              <MapPin size={16} aria-hidden /> {loc.clinic_location}
                               <span className="location-label">— {loc.is_preferred ? 'Preferred location' : 'Alternative location'}</span>
                             </h4>
                             <div className="recommendation-labels">

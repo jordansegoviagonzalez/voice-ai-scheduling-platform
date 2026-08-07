@@ -74,6 +74,7 @@ def _create_session(organization_slug: str | None = None) -> ResponseReturnValue
     chat_service, workflow = get_services(organization_slug)
     if patient_mode == "returning":
         patient = workflow.patient_access.verify_returning_patient(
+            organization_id=workflow.organization_id,
             email=_string_field(data, "email", max_length=255),
             password=_password_field(data, "password", required=True),
         )
@@ -268,6 +269,7 @@ def _register_new_patient(workflow: ChatWorkflowService, data: dict[str, object]
     email = _string_field(data, "email", max_length=255)
     insurance_provider = _string_field(data, "insuranceProvider", "insurance_provider", max_length=255)
     patient, _ = workflow.patient_access.create_or_get_new_patient(
+        organization_id=workflow.organization_id,
         full_name=f"{first_name} {last_name}",
         date_of_birth=date_of_birth,
         phone=phone,

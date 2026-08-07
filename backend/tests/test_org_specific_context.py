@@ -29,9 +29,15 @@ def test_org_slug_chat_session_persists_and_enforces_organization_context(client
     created = client.post(
         f"/api/chat/organizations/{org_a.slug}/sessions",
         json={
-            "patientMode": "returning",
-            "email": "olivia.carter.phase2.demo@example.com",
-            "password": "Patient!2026",
+            "patientMode": "new",
+            "firstName": "Oliver",
+            "lastName": "Twist",
+            "dateOfBirth": "1980-05-15",
+            "phone": "805-555-0999",
+            "email": "oliver@example.com",
+            "password": "Password!123",
+            "confirmPassword": "Password!123",
+            "insuranceProvider": "Aetna",
         },
     )
 
@@ -242,6 +248,39 @@ def test_org_slug_vogent_inbound_and_routing_use_selected_organization(client: F
     assert wrong_org.status_code == 409, wrong_org.get_json()
     assert wrong_org.get_json()["error"]["code"] == "ORGANIZATION_CONTEXT_MISMATCH"
 
+    same_org_update = client.post(
+        f"/api/v1/organizations/slug/{cardiology_org.slug}/vogent/webhooks",
+        json={
+            "event": "dial.updated",
+            "event_id": "org-context-update",
+            "payload": {"dial_id": "dial-org-context-001", "status": "in-progress"},
+        },
+    )
+    assert same_org_update.status_code == 200, same_org_update.get_json()
+
+    wrong_org_webhook = client.post(
+        f"/api/v1/organizations/slug/{dental_org.slug}/vogent/webhooks",
+        json={
+            "event": "dial.transcript",
+            "event_id": "org-context-wrong-transcript",
+            "payload": {
+                "dial_id": "dial-org-context-001",
+                "transcript": [{"speaker": "USER", "text": "This should not attach to the wrong org."}],
+            },
+        },
+    )
+    assert wrong_org_webhook.status_code == 409, wrong_org_webhook.get_json()
+    assert wrong_org_webhook.get_json()["error"]["code"] == "ORGANIZATION_CONTEXT_MISMATCH"
+
+    db_session = get_session_factory()()
+    try:
+        call = db_session.get(Call, call_id)
+        assert call is not None
+        assert call.organization_id == cardiology_org.id
+        assert call.organization_id != dental_org.id
+    finally:
+        db_session.close()
+
 
 def _doctor_with_slot(
     *,
@@ -294,3 +333,54 @@ def _doctor_with_slot(
         return organization, doctor
     finally:
         session.close()
+
+
+def test_org_slug_patient_lookup_leaks_across_organizations(client: FlaskClient) -> None:
+    # 1. Create Org A and Org B
+    org_a, _ = _doctor_with_slot(
+        slug="org-a-context",
+        organization_name="Org A Context",
+        doctor_first_name="Alice",
+        doctor_last_name="Smith",
+        area="Primary Care",
+        issue_type="Routine Consult",
+    )
+    org_b, _ = _doctor_with_slot(
+        slug="org-b-context",
+        organization_name="Org B Context",
+        doctor_first_name="Bob",
+        doctor_last_name="Jones",
+        area="Primary Care",
+        issue_type="Routine Consult",
+    )
+
+    # 2. Create a patient through Org B's chat intake
+    created = client.post(
+        f"/api/chat/organizations/{org_b.slug}/sessions",
+        json={
+            "patientMode": "new",
+            "firstName": "Leak",
+            "lastName": "Test",
+            "dateOfBirth": "1990-01-01",
+            "phone": "805-555-8888",
+            "email": "leak.test@example.com",
+            "password": "Password!12345",
+            "confirmPassword": "Password!12345",
+            "insuranceProvider": "Cigna",
+        },
+    )
+    assert created.status_code == 201, created.get_json()
+
+    # 3. Lookup (sign in) as returning patient from Org A
+    leaked = client.post(
+        f"/api/chat/organizations/{org_a.slug}/sessions",
+        json={
+            "patientMode": "returning",
+            "email": "leak.test@example.com",
+            "password": "Password!12345",
+        },
+    )
+
+    # 4. Prove that Org A CANNOT find Org B's patient
+    # This verifies the patient data is isolated by organization.
+    assert leaked.status_code == 401, "Expected Org A to fail to find the patient (proving isolation)"

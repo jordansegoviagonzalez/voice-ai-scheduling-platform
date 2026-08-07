@@ -576,6 +576,7 @@ def _create_sophia_session_at_availability_preference(
     chat_service: ChatSessionService,
 ) -> int:
     sophia = Patient(
+        organization_id=1,
         first_name="Sophia",
         last_name="Martinez",
         date_of_birth=datetime.fromisoformat("1991-04-18").date(),

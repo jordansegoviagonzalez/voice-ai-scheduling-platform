@@ -89,10 +89,20 @@ def vogent_patient_lookup(organization_slug: str | None = None):  # type: ignore
     require_fields(payload, "phone", "date_of_birth")
 
     def handler(session, explicit_organization_id):  # type: ignore[no-untyped-def]
-        _ = explicit_organization_id
+        organization_id = call_organization_id(
+            session,
+            call_id=int_or_none(payload.get("call_id"), "call_id"),
+            explicit_organization_id=explicit_organization_id,
+        )
         phone = normalize_phone(bounded_string(payload, "phone", max_length=32) or "")
         dob = normalize_date_of_birth(bounded_string(payload, "date_of_birth", max_length=64) or "")
-        patient = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
+        patient = session.scalar(
+            select(Patient).where(
+                Patient.organization_id == organization_id,
+                Patient.phone == phone,
+                Patient.date_of_birth == dob,
+            )
+        )
         return (
             {
                 "found": patient is not None,
@@ -233,6 +243,11 @@ def vogent_confirm_slot(organization_slug: str | None = None):  # type: ignore[n
                 "location_name": confirmation.location.name,
                 "starts_at": confirmation.starts_at.isoformat(),
                 "expires_at": confirmation.expires_at.isoformat(),
+                "address_line1": confirmation.location.address_line1,
+                "address_line2": confirmation.location.address_line2,
+                "city": confirmation.location.city,
+                "state": confirmation.location.state,
+                "postal_code": confirmation.location.postal_code,
             },
             201,
         )
@@ -273,6 +288,11 @@ def vogent_book(organization_slug: str | None = None):  # type: ignore[no-untype
                 "doctor_name": appointment.doctor.full_name,
                 "location_name": appointment.location.name,
                 "starts_at": appointment.slot.starts_at.isoformat(),
+                "address_line1": appointment.location.address_line1,
+                "address_line2": appointment.location.address_line2,
+                "city": appointment.location.city,
+                "state": appointment.location.state,
+                "postal_code": appointment.location.postal_code,
             },
             201,
         )

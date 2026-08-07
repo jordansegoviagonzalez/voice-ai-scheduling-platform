@@ -67,6 +67,7 @@ def simulator_preview():  # type: ignore[no-untyped-def]
     patient = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
     if patient is None:
         patient = Patient(
+            organization_id=organization_id,
             first_name=first_name,
             last_name=last_name,
             date_of_birth=dob,

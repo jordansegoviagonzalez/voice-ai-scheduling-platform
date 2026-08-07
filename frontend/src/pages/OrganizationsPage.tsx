@@ -20,10 +20,10 @@ import { DataTable } from '../components/DataTable';
 import { EmptyState, ErrorState, LoadingState } from '../components/States';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
-import type { Doctor, DoctorInput, Organization, OrganizationInput, OrganizationStatus } from '../types/api';
+import type { Doctor, DoctorInput, Location, LocationInput, Organization, OrganizationInput, OrganizationStatus } from '../types/api';
 
 const DEFAULT_TIMEZONE = 'America/Los_Angeles';
-const ORGANIZATION_TABS = ['Details', 'Doctors', 'Settings', 'Activity'] as const;
+const ORGANIZATION_TABS = ['Details', 'Doctors', 'Locations', 'Settings', 'Activity'] as const;
 const CAPABILITY_AREA_OPTIONS = [
   { value: '', label: 'None' },
   { value: 'General', label: 'General' },
@@ -94,6 +94,16 @@ type UpdateDoctorMutation = UseMutationResult<
   Error,
   { organizationId: number; doctorId: number; body: Partial<DoctorInput> }
 >;
+type CreateLocationMutation = UseMutationResult<
+  { location: Location },
+  Error,
+  { organizationId: number; body: LocationInput }
+>;
+type UpdateLocationMutation = UseMutationResult<
+  { location: Location },
+  Error,
+  { organizationId: number; locationId: number; body: Partial<LocationInput> }
+>;
 
 export function OrganizationsPage() {
   const queryClient = useQueryClient();
@@ -132,6 +142,16 @@ export function OrganizationsPage() {
     if (organization.id === selectedOrganization?.id) return total + selectedDoctorCount;
     return total + (organization.doctor_count ?? 0);
   }, 0);
+  const locationsQuery = useQuery({
+    queryKey: ['organization-locations', selectedOrganizationId],
+    queryFn: () => schedulingApi.organizationLocations(selectedOrganizationId as number),
+    enabled: selectedOrganizationId !== null,
+  });
+  const selectedLocations = useMemo(() => {
+    if (!selectedOrganization) return [];
+    return (locationsQuery.data?.locations ?? []).filter((location) => location.organization_id === selectedOrganization.id);
+  }, [locationsQuery.data, selectedOrganization]);
+
   const activeOrganizations = organizations.filter((organization) => organization.active).length;
   const activePercent = organizations.length === 0 ? '0%' : `${Math.round((activeOrganizations / organizations.length) * 100)}%`;
 
@@ -170,6 +190,22 @@ export function OrganizationsPage() {
       schedulingApi.updateOrganizationDoctor(organizationId, doctorId, body),
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['organization-doctors', variables.organizationId] });
+    },
+  });
+
+  const createLocation = useMutation({
+    mutationFn: ({ organizationId, body }: { organizationId: number; body: LocationInput }) =>
+      schedulingApi.createOrganizationLocation(organizationId, body),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ['organization-locations', variables.organizationId] });
+    },
+  });
+
+  const updateLocation = useMutation({
+    mutationFn: ({ organizationId, locationId, body }: { organizationId: number; locationId: number; body: Partial<LocationInput> }) =>
+      schedulingApi.updateOrganizationLocation(organizationId, locationId, body),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ['organization-locations', variables.organizationId] });
     },
   });
 
@@ -223,10 +259,15 @@ export function OrganizationsPage() {
                 doctorCount={selectedDoctorCount}
                 doctorsLoading={doctorsQuery.isLoading}
                 doctorsError={doctorsQuery.isError ? doctorsQuery.error.message : null}
+                locations={selectedLocations}
+                locationsLoading={locationsQuery.isLoading}
+                locationsError={locationsQuery.isError ? locationsQuery.error.message : null}
                 activeTab={activeTab}
                 updateOrganization={updateOrganization}
                 createDoctor={createDoctor}
                 updateDoctor={updateDoctor}
+                createLocation={createLocation}
+                updateLocation={updateLocation}
                 onTabChange={setActiveTab}
               />
             </>
@@ -413,10 +454,15 @@ function SelectedOrganizationWorkspace({
   doctorCount,
   doctorsLoading,
   doctorsError,
+  locations,
+  locationsLoading,
+  locationsError,
   activeTab,
   updateOrganization,
   createDoctor,
   updateDoctor,
+  createLocation,
+  updateLocation,
   onTabChange,
 }: {
   organization: Organization;
@@ -424,10 +470,15 @@ function SelectedOrganizationWorkspace({
   doctorCount: number;
   doctorsLoading: boolean;
   doctorsError: string | null;
+  locations: Location[];
+  locationsLoading: boolean;
+  locationsError: string | null;
   activeTab: OrganizationTab;
   updateOrganization: UpdateOrganizationMutation;
   createDoctor: CreateDoctorMutation;
   updateDoctor: UpdateDoctorMutation;
+  createLocation: CreateLocationMutation;
+  updateLocation: UpdateLocationMutation;
   onTabChange: (tab: OrganizationTab) => void;
 }) {
   return (
@@ -468,6 +519,16 @@ function SelectedOrganizationWorkspace({
         ))}
       </div>
       {activeTab === 'Details' ? <OrganizationDetailsTab organization={organization} doctorCount={doctorCount} /> : null}
+      {activeTab === 'Locations' ? (
+        <LocationsTab
+          organization={organization}
+          locations={locations}
+          loading={locationsLoading}
+          error={locationsError}
+          createMutation={createLocation}
+          updateMutation={updateLocation}
+        />
+      ) : null}
       {activeTab === 'Doctors' ? (
         <DoctorsTab
           organization={organization}
@@ -506,6 +567,17 @@ function SummaryTile({
 }
 
 function OrganizationDetailsTab({ organization, doctorCount }: { organization: Organization; doctorCount: number }) {
+  const chatLink = organization.client_links
+    ? `${window.location.origin}${organization.client_links.chat_path}`
+    : `${window.location.origin}/chat/${organization.slug}`;
+  const webhookPath = organization.client_links
+    ? organization.client_links.vogent_webhook_path
+    : `/api/v1/organizations/slug/${organization.slug}/vogent/webhooks`;
+  const functionPath = organization.client_links
+    ? organization.client_links.vogent_function_base_path
+    : `/api/v1/organizations/slug/${organization.slug}/vogent/functions`;
+  const voicePhoneNumber = organization.voice?.phone_number ?? null;
+
   return (
     <div className="organization-tab-panel">
       <div className="organization-details-grid">
@@ -515,6 +587,56 @@ function OrganizationDetailsTab({ organization, doctorCount }: { organization: O
         <DetailItem label="Status" value={organization.status} />
         <DetailItem label="Timezone" value={organization.timezone} />
         <DetailItem label="Doctor records" value={doctorCount} />
+      </div>
+      <div className="organization-details-section">
+        <h4>Client-specific links to chat with or call the AI</h4>
+        <p style={{ marginTop: '6px', fontSize: '13px', color: '#666' }}>
+          This organization&apos;s chat and voice intake use its own doctors, hours, addresses, locations, and routing rules.
+        </p>
+        <div style={{ marginTop: '16px' }}>
+          <h5>Chat AI Receptionist</h5>
+          <div className="chat-link-box" style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '8px' }}>
+            <a href={chatLink} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>{chatLink}</a>
+            <button className="button secondary compact-button" type="button" onClick={() => navigator.clipboard.writeText(chatLink)}>Copy</button>
+          </div>
+        </div>
+        <div style={{ marginTop: '16px' }}>
+          <h5>Voice AI Receptionist</h5>
+          <div style={{ marginTop: '8px', padding: '12px', background: '#f5f5f5', borderRadius: '4px', fontSize: '14px' }}>
+            {voicePhoneNumber ? (
+              <div>
+                <strong>Voice number:</strong> {voicePhoneNumber}
+              </div>
+            ) : (
+              <div>Voice number not configured yet</div>
+            )}
+            <div style={{ marginTop: '8px' }}>
+              <strong>Vogent webhook:</strong>{' '}
+              <span data-testid="vogent-webhook-path">{webhookPath}</span>
+            </div>
+            <div style={{ marginTop: '4px' }}>
+              <strong>Vogent functions:</strong>{' '}
+              <span data-testid="vogent-function-path">{functionPath}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="organization-details-section" style={{ marginTop: '20px' }}>
+        <h4>Business Hours</h4>
+        {organization.business_hours && Object.keys(organization.business_hours).length > 0 ? (
+          <dl className="business-hours-list">
+            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+              organization.business_hours[day] ? (
+                <div key={day} style={{ display: 'flex', gap: '10px', marginBottom: '4px' }}>
+                  <dt style={{ width: '100px', fontWeight: 500 }}>{day}</dt>
+                  <dd style={{ margin: 0 }}>{organization.business_hours[day]}</dd>
+                </div>
+              ) : null
+            ))}
+          </dl>
+        ) : (
+          <p>No business hours configured.</p>
+        )}
       </div>
     </div>
   );
@@ -759,6 +881,15 @@ function OrganizationForm({
           </select>
         </label>
       ) : null}
+      <fieldset className="advanced-field" style={{ padding: '15px', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+        <legend>Business Hours (optional)</legend>
+        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+          <label key={day} htmlFor={`${prefix}-hours-${day}`} style={{ marginBottom: '8px' }}>
+            {day}
+            <input id={`${prefix}-hours-${day}`} name={`hours_${day}`} defaultValue={organization?.business_hours?.[day] ?? ''} placeholder="e.g. 9:00 AM - 5:00 PM" />
+          </label>
+        ))}
+      </fieldset>
       <button className="button primary" type="submit" disabled={disabled}>{submitLabel}</button>
     </form>
   );
@@ -839,6 +970,14 @@ function toOrganizationInput(form: FormData, includeStatus = false): Organizatio
   const slug = formValue(form, 'slug');
   if (slug) body.slug = slug;
   if (includeStatus) body.status = formValue(form, 'status') as OrganizationStatus;
+
+  const business_hours: Record<string, string> = {};
+  ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(day => {
+    const val = formValue(form, `hours_${day}`);
+    if (val) business_hours[day] = val;
+  });
+  body.business_hours = business_hours;
+
   return body;
 }
 
@@ -891,4 +1030,195 @@ function doctorMatchesSearch(doctor: Doctor, query: string): boolean {
     .join(' ')
     .toLowerCase()
     .includes(query);
+}
+
+function LocationsTab({
+  organization,
+  locations,
+  loading,
+  error,
+  createMutation,
+  updateMutation,
+}: {
+  organization: Organization;
+  locations: Location[];
+  loading: boolean;
+  error: string | null;
+  createMutation: CreateLocationMutation;
+  updateMutation: UpdateLocationMutation;
+}) {
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+
+  useEffect(() => {
+    setCreateOpen(false);
+    setEditingLocation(null);
+  }, [organization.id]);
+
+  if (loading) {
+    return <LoadingState label="Loading locations" />;
+  }
+  if (error) {
+    return <ErrorState message={error} />;
+  }
+
+  return (
+    <div className="organization-tab-panel">
+      <div className="tab-toolbar">
+        <div>
+          <h3>Locations</h3>
+          <p>Manage clinics and addresses for this organization.</p>
+        </div>
+        <div className="tab-toolbar-actions">
+          <button
+            className="button primary"
+            type="button"
+            onClick={() => {
+              setCreateOpen((current) => !current);
+              setEditingLocation(null);
+            }}
+          >
+            <Plus size={15} />
+            Add location
+          </button>
+        </div>
+      </div>
+      {createOpen ? (
+        <div className="organization-inline-form wide">
+          <LocationForm
+            formId="new-location"
+            submitLabel={createMutation.isPending ? 'Creating...' : 'Create location'}
+            disabled={createMutation.isPending}
+            onSubmit={(body, form) => {
+              createMutation.mutate(
+                { organizationId: organization.id, body },
+                {
+                  onSuccess: () => {
+                    form.reset();
+                    setCreateOpen(false);
+                  },
+                },
+              );
+            }}
+          />
+          {createMutation.isError ? <div className="alert-box error"><p>{createMutation.error.message}</p></div> : null}
+        </div>
+      ) : null}
+      {editingLocation ? (
+        <div className="organization-inline-form wide">
+          <div className="inline-form-header">
+            <strong>Edit {editingLocation.name}</strong>
+            <button className="button secondary compact-button" type="button" onClick={() => setEditingLocation(null)}>
+              Cancel
+            </button>
+          </div>
+          <LocationForm
+            formId="edit-location"
+            location={editingLocation}
+            submitLabel={updateMutation.isPending ? 'Saving...' : 'Save location'}
+            disabled={updateMutation.isPending}
+            onSubmit={(body) => {
+              updateMutation.mutate(
+                { organizationId: organization.id, locationId: editingLocation.id, body },
+                { onSuccess: () => setEditingLocation(null) },
+              );
+            }}
+          />
+          {updateMutation.isError ? <div className="alert-box error"><p>{updateMutation.error.message}</p></div> : null}
+        </div>
+      ) : null}
+      {locations.length === 0 ? (
+        <EmptyState title="No locations" detail="Add a location for this organization." />
+      ) : (
+        <DataTable label="Organization locations" headers={['Code', 'Name', 'Address', 'Actions']}>
+          {locations.map((location) => (
+            <tr key={location.id}>
+              <td><strong>{location.code}</strong></td>
+              <td>{location.name}</td>
+              <td>
+                {[location.address_line1, location.address_line2, location.city, location.state, location.postal_code]
+                  .filter(Boolean)
+                  .join(', ') || 'No address'}
+              </td>
+              <td>
+                <span className="table-actions">
+                  <button className="button secondary compact-button" type="button" onClick={() => setEditingLocation(location)}>
+                    <Pencil size={14} />
+                    Edit
+                  </button>
+                </span>
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
+    </div>
+  );
+}
+
+function LocationForm({
+  location,
+  formId,
+  submitLabel,
+  disabled,
+  onSubmit,
+}: {
+  location?: Location;
+  formId: string;
+  submitLabel: string;
+  disabled: boolean;
+  onSubmit: (body: LocationInput, form: HTMLFormElement) => void;
+}) {
+  return (
+    <form
+      className="doctor-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        onSubmit(toLocationInput(form), event.currentTarget);
+      }}
+    >
+      <label htmlFor={`${formId}-code`}>
+        Location code (e.g. CLINIC-1)
+        <input id={`${formId}-code`} name="code" defaultValue={location?.code ?? ''} required maxLength={16} />
+      </label>
+      <label htmlFor={`${formId}-name`}>
+        Location name
+        <input id={`${formId}-name`} name="name" defaultValue={location?.name ?? ''} required maxLength={120} />
+      </label>
+      <label htmlFor={`${formId}-address1`}>
+        Address Line 1
+        <input id={`${formId}-address1`} name="address_line1" defaultValue={location?.address_line1 ?? ''} maxLength={100} />
+      </label>
+      <label htmlFor={`${formId}-address2`}>
+        Address Line 2
+        <input id={`${formId}-address2`} name="address_line2" defaultValue={location?.address_line2 ?? ''} maxLength={100} />
+      </label>
+      <label htmlFor={`${formId}-city`}>
+        City
+        <input id={`${formId}-city`} name="city" defaultValue={location?.city ?? ''} maxLength={100} />
+      </label>
+      <label htmlFor={`${formId}-state`}>
+        State
+        <input id={`${formId}-state`} name="state" defaultValue={location?.state ?? ''} maxLength={50} />
+      </label>
+      <label htmlFor={`${formId}-postal`}>
+        Postal Code
+        <input id={`${formId}-postal`} name="postal_code" defaultValue={location?.postal_code ?? ''} maxLength={20} />
+      </label>
+      <button className="button primary" type="submit" disabled={disabled}>{submitLabel}</button>
+    </form>
+  );
+}
+
+function toLocationInput(form: FormData): LocationInput {
+  return {
+    code: formValue(form, 'code'),
+    name: formValue(form, 'name'),
+    address_line1: formValue(form, 'address_line1') || undefined,
+    address_line2: formValue(form, 'address_line2') || undefined,
+    city: formValue(form, 'city') || undefined,
+    state: formValue(form, 'state') || undefined,
+    postal_code: formValue(form, 'postal_code') || undefined,
+  };
 }

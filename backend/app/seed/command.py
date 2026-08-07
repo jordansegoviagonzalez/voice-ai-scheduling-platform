@@ -169,6 +169,7 @@ def seed_database(session: Session) -> None:
             )
         if patient is None:
             patient = Patient(
+                organization_id=organization_id,
                 first_name=first,
                 last_name=last,
                 date_of_birth=dob,

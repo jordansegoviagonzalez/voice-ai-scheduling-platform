@@ -52,11 +52,25 @@ export function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(() => signInNotice(location.state));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orgLoading, setOrgLoading] = useState(Boolean(searchParams.get('org')));
+  const [orgName, setOrgName] = useState<string | null>(null);
+  const orgSlug = searchParams.get('org');
   const errorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setView(searchParams.get('role') === 'admin' ? 'admin' : 'choice');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (orgSlug) {
+      apiRequestAbsolute<{ organization: { name: string } }>(`/api/v1/organizations/slug/${orgSlug}`)
+        .then((res) => setOrgName(res.organization.name))
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : 'This clinic link is invalid or inactive.');
+        })
+        .finally(() => setOrgLoading(false));
+    }
+  }, [orgSlug]);
 
   useEffect(() => {
     setNotice(signInNotice(location.state));
@@ -66,8 +80,20 @@ export function SignInPage() {
     if (error) errorRef.current?.focus();
   }, [error]);
 
-  if (user) {
+  if (user && view === 'admin') {
     return <Navigate to="/" replace />;
+  }
+
+  if (orgLoading) {
+    return (
+      <main className="signin-page">
+        <section className="signin-panel">
+          <div>
+            <h1>Loading clinic details...</h1>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   const beginView = (nextView: EntryView) => {
@@ -112,12 +138,15 @@ export function SignInPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const data = await apiRequestAbsolute<ChatSessionResponse>('/api/chat/sessions', {
+      const sessionUrl = orgSlug
+        ? `/api/chat/organizations/${orgSlug}/sessions`
+        : '/api/chat/sessions';
+      const data = await apiRequestAbsolute<ChatSessionResponse>(sessionUrl, {
         method: 'POST',
         body: JSON.stringify({ patientMode: 'returning', email, password }),
       });
       localStorage.setItem('patientChatSessionId', String(data.sessionId));
-      navigate('/chat', {
+      navigate(orgSlug ? `/chat/${orgSlug}` : '/chat', {
         state: { sessionId: data.sessionId, initialMessages: data.assistantMessage ? [data.assistantMessage] : [] },
       });
     } catch (err: unknown) {
@@ -142,7 +171,10 @@ export function SignInPage() {
     }
     setIsSubmitting(true);
     try {
-      const data = await apiRequestAbsolute<ChatSessionResponse>('/api/chat/sessions', {
+      const sessionUrl = orgSlug
+        ? `/api/chat/organizations/${orgSlug}/sessions`
+        : '/api/chat/sessions';
+      const data = await apiRequestAbsolute<ChatSessionResponse>(sessionUrl, {
         method: 'POST',
         body: JSON.stringify({
           patientMode: 'new',
@@ -158,7 +190,7 @@ export function SignInPage() {
       });
       clearPasswordFields();
       localStorage.setItem('patientChatSessionId', String(data.sessionId));
-      navigate('/chat', {
+      navigate(orgSlug ? `/chat/${orgSlug}` : '/chat', {
         state: { sessionId: data.sessionId, initialMessages: data.assistantMessage ? [data.assistantMessage] : [] },
       });
     } catch (err: unknown) {
@@ -177,8 +209,8 @@ export function SignInPage() {
               <Activity size={24} aria-hidden />
             </div>
             <div>
-              <strong>Voice AI Scheduling Platform</strong>
-              <span>Multi-specialty scheduling</span>
+              <strong>{orgName || 'Voice AI Scheduling Platform'}</strong>
+              <span>{orgName ? 'Clinic scheduling' : 'Multi-specialty scheduling'}</span>
             </div>
           </div>
 

@@ -21,6 +21,7 @@ services:
         INSTALL_DEV_DEPENDENCIES: "true"
     environment:
       APP_ENV: development
+      PYTHONPATH: /app
       SECRET_KEY: ${SECRET_KEY:-local-development-key}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-scheduling}:${POSTGRES_PASSWORD:-scheduling}@db:5432/${POSTGRES_DB:-scheduling}
       FRONTEND_ORIGIN: http://localhost:5173

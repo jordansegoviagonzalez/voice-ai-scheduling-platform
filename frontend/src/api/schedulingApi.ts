@@ -5,6 +5,8 @@ import type {
   Call,
   Doctor,
   DoctorInput,
+  Location,
+  LocationInput,
   Organization,
   OrganizationInput,
   OverviewResponse,
@@ -37,6 +39,18 @@ export const schedulingApi = {
     }),
   updateOrganizationDoctor: (organizationId: string | number, doctorId: string | number, body: Partial<DoctorInput>) =>
     apiRequest<{ doctor: Doctor }>(`/organizations/${organizationId}/doctors/${doctorId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  organizationLocations: (organizationId: string | number) =>
+    apiRequest<{ locations: Location[] }>(`/organizations/${organizationId}/locations`),
+  createOrganizationLocation: (organizationId: string | number, body: LocationInput) =>
+    apiRequest<{ location: Location }>(`/organizations/${organizationId}/locations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateOrganizationLocation: (organizationId: string | number, locationId: string | number, body: Partial<LocationInput>) =>
+    apiRequest<{ location: Location }>(`/organizations/${organizationId}/locations/${locationId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),

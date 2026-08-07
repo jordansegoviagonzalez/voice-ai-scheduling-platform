@@ -12,12 +12,16 @@ from app.services.organizations import (
     create_organization,
     doctor_or_404,
     doctor_query,
+    location_or_404,
+    location_query,
+    create_location,
+    update_location,
     organization_or_404,
     resolve_active_organization_by_slug,
     update_doctor,
     update_organization,
 )
-from app.services.serializers import doctor_json, organization_json, public_organization_json
+from app.services.serializers import doctor_json, organization_json, public_organization_json, location_json
 
 bp = Blueprint("organizations", __name__)
 
@@ -101,3 +105,42 @@ def patch_organization_doctor(organization_id: int, doctor_id: int):  # type: ig
     doctor = update_doctor(session, organization, doctor, json_body(request))
     session.commit()
     return jsonify({"doctor": doctor_json(doctor)})
+
+
+@bp.get("/organizations/<int:organization_id>/locations")
+def list_organization_locations(organization_id: int):  # type: ignore[no-untyped-def]
+    require_admin_session()
+    session = get_session()
+    organization_or_404(session, organization_id)
+    locations = list(session.scalars(location_query(organization_id)))
+    return jsonify({"locations": [location_json(location) for location in locations]})
+
+
+@bp.post("/organizations/<int:organization_id>/locations")
+def create_organization_location_endpoint(organization_id: int):  # type: ignore[no-untyped-def]
+    require_admin_session()
+    session = get_session()
+    organization = organization_or_404(session, organization_id)
+    location = create_location(session, organization, json_body(request))
+    session.commit()
+    return jsonify({"location": location_json(location)}), 201
+
+
+@bp.get("/organizations/<int:organization_id>/locations/<int:location_id>")
+def get_organization_location(organization_id: int, location_id: int):  # type: ignore[no-untyped-def]
+    require_admin_session()
+    session = get_session()
+    organization_or_404(session, organization_id)
+    location = location_or_404(session, organization_id, location_id)
+    return jsonify({"location": location_json(location)})
+
+
+@bp.patch("/organizations/<int:organization_id>/locations/<int:location_id>")
+def patch_organization_location(organization_id: int, location_id: int):  # type: ignore[no-untyped-def]
+    require_admin_session()
+    session = get_session()
+    organization = organization_or_404(session, organization_id)
+    location = location_or_404(session, organization_id, location_id)
+    location = update_location(session, organization, location, json_body(request))
+    session.commit()
+    return jsonify({"location": location_json(location)})

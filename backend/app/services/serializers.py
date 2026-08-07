@@ -30,9 +30,20 @@ def organization_json(organization: Organization) -> dict[str, Any]:
         "doctor_count": len(organization.doctors),
         "status": organization.status,
         "timezone": organization.timezone,
+        "business_hours": organization.business_hours,
         "active": organization.status == "ACTIVE",
         "created_at": organization.created_at.isoformat(),
         "updated_at": organization.updated_at.isoformat(),
+        "client_links": {
+            "chat_path": f"/chat/{organization.slug}",
+            "vogent_webhook_path": f"/api/v1/organizations/slug/{organization.slug}/vogent/webhooks",
+            "vogent_function_base_path": f"/api/v1/organizations/slug/{organization.slug}/vogent/functions",
+        },
+        "voice": {
+            "enabled": organization.voice_enabled,
+            "phone_number": organization.voice_phone_number,
+            "status": "Configured" if organization.voice_phone_number else "Voice number not configured yet",
+        },
     }
 
 
@@ -44,6 +55,17 @@ def public_organization_json(organization: Organization) -> dict[str, Any]:
         "organization_type": organization_type_for_slug(organization.slug),
         "status": organization.status,
         "timezone": organization.timezone,
+        "business_hours": organization.business_hours,
+        "client_links": {
+            "chat_path": f"/chat/{organization.slug}",
+            "vogent_webhook_path": f"/api/v1/organizations/slug/{organization.slug}/vogent/webhooks",
+            "vogent_function_base_path": f"/api/v1/organizations/slug/{organization.slug}/vogent/functions",
+        },
+        "voice": {
+            "enabled": organization.voice_enabled,
+            "phone_number": organization.voice_phone_number,
+            "status": "Configured" if organization.voice_phone_number else "Voice number not configured yet",
+        },
     }
 
 
@@ -80,6 +102,11 @@ def location_json(location: Location) -> dict[str, Any]:
         "organization_id": location.organization_id,
         "code": location.code,
         "name": location.name,
+        "address_line1": location.address_line1,
+        "address_line2": location.address_line2,
+        "city": location.city,
+        "state": location.state,
+        "postal_code": location.postal_code,
     }
 
 

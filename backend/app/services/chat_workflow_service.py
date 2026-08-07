@@ -63,6 +63,7 @@ class ChatWorkflowService:
 
     def authenticate_returning_patient(self, session_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         patient = self.patient_access.verify_returning_patient(
+            organization_id=self.organization_id,
             email=payload.get("email"),
             password=payload.get("password"),
             full_name=payload.get("fullName"),
@@ -147,6 +148,7 @@ class ChatWorkflowService:
         if self._intake_complete(chat_session):
             if chat_session.collected_data_json.get("patient_type") == "new" and not chat_session.patient_id:
                 patient, created = self.patient_access.create_or_get_new_patient(
+                    organization_id=self.organization_id,
                     full_name=str(chat_session.collected_data_json["full_name"]),
                     date_of_birth=str(chat_session.collected_data_json["date_of_birth"]),
                     phone=str(chat_session.collected_data_json["phone"]),

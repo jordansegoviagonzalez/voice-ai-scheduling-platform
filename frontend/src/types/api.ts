@@ -10,7 +10,18 @@ export interface Organization {
   doctor_count?: number;
   status: OrganizationStatus;
   timezone: string;
+  business_hours: Record<string, string>;
   active: boolean;
+  client_links?: {
+    chat_path: string;
+    vogent_webhook_path: string;
+    vogent_function_base_path: string;
+  };
+  voice?: {
+    enabled: boolean;
+    phone_number: string | null;
+    status: string;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -20,6 +31,9 @@ export interface OrganizationInput {
   slug?: string;
   status?: OrganizationStatus;
   timezone?: string;
+  business_hours?: Record<string, string>;
+  voice_enabled?: boolean;
+  voice_phone_number?: string | null;
 }
 
 export interface Location {
@@ -27,6 +41,21 @@ export interface Location {
   organization_id: number;
   code: string;
   name: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+}
+
+export interface LocationInput {
+  code: string;
+  name: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
 }
 
 export interface Capability {

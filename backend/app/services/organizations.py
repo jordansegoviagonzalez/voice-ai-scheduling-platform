@@ -60,9 +60,23 @@ def create_organization(session: Session, payload: dict[str, Any]) -> Organizati
         )
     status = _organization_status(payload.get("status", ACTIVE_ORGANIZATION_STATUS))
     timezone = _timezone(payload.get("timezone", DEFAULT_ORGANIZATION_TIMEZONE))
+    business_hours = payload.get("business_hours", {})
+    if not isinstance(business_hours, dict):
+        raise ApiError("VALIDATION_ERROR", "business_hours must be an object.", 422, {"business_hours": ["Invalid object"]})
+    voice_enabled = _bool_field(payload, "voice_enabled", required=False, default=False)
+    voice_phone_number = _string_field(payload, "voice_phone_number", max_length=20, required=False) if payload.get("voice_phone_number") is not None else None
+
     _ensure_slug_available(session, slug)
 
-    organization = Organization(slug=slug, name=name, status=status, timezone=timezone)
+    organization = Organization(
+        slug=slug,
+        name=name,
+        status=status,
+        timezone=timezone,
+        business_hours=business_hours,
+        voice_enabled=voice_enabled,
+        voice_phone_number=voice_phone_number,
+    )
     session.add(organization)
     _flush_or_slug_conflict(session)
     return organization
@@ -87,6 +101,19 @@ def update_organization(session: Session, organization: Organization, payload: d
         organization.status = _organization_status(payload["status"])
     if "timezone" in payload:
         organization.timezone = _timezone(payload["timezone"])
+    if "business_hours" in payload:
+        business_hours = payload["business_hours"]
+        if not isinstance(business_hours, dict):
+            raise ApiError("VALIDATION_ERROR", "business_hours must be an object.", 422, {"business_hours": ["Invalid object"]})
+        organization.business_hours = business_hours
+    if "voice_enabled" in payload:
+        organization.voice_enabled = _bool_field(payload, "voice_enabled", required=True)
+    if "voice_phone_number" in payload:
+        val = payload["voice_phone_number"]
+        if val is None:
+            organization.voice_phone_number = None
+        else:
+            organization.voice_phone_number = _string_field(payload, "voice_phone_number", max_length=20)
 
     _flush_or_slug_conflict(session)
     return organization
@@ -377,3 +404,64 @@ def _flush_or_doctor_conflict(session: Session) -> None:
             "A physician with this name already exists for this organization.",
             409,
         ) from error
+
+def location_or_404(session: Session, organization_id: int, location_id: int) -> Location:
+    location = session.scalar(_location_query(organization_id).where(Location.id == location_id))
+    if location is None:
+        raise ApiError("LOCATION_NOT_FOUND", "Location was not found for this organization.", 404)
+    return location
+
+def location_query(organization_id: int):  # type: ignore[no-untyped-def]
+    return _location_query(organization_id)
+
+def _location_query(organization_id: int):  # type: ignore[no-untyped-def]
+    return (
+        select(Location)
+        .where(Location.organization_id == organization_id)
+        .order_by(Location.name)
+    )
+
+def create_location(session: Session, organization: Organization, payload: dict[str, Any]) -> Location:
+    code = _string_field(payload, "code", max_length=16)
+    name = _string_field(payload, "name", max_length=120)
+
+    location = Location(
+        organization_id=organization.id,
+        code=code,
+        name=name,
+        address_line1=payload.get("address_line1"),
+        address_line2=payload.get("address_line2"),
+        city=payload.get("city"),
+        state=payload.get("state"),
+        postal_code=payload.get("postal_code"),
+    )
+    session.add(location)
+    try:
+        session.flush()
+    except IntegrityError as error:
+        session.rollback()
+        raise ApiError("LOCATION_CONFLICT", "A location with this code or name already exists.", 409) from error
+    return location
+
+def update_location(session: Session, organization: Organization, location: Location, payload: dict[str, Any]) -> Location:
+    if "code" in payload:
+        location.code = _string_field(payload, "code", max_length=16)
+    if "name" in payload:
+        location.name = _string_field(payload, "name", max_length=120)
+    if "address_line1" in payload:
+        location.address_line1 = payload.get("address_line1")
+    if "address_line2" in payload:
+        location.address_line2 = payload.get("address_line2")
+    if "city" in payload:
+        location.city = payload.get("city")
+    if "state" in payload:
+        location.state = payload.get("state")
+    if "postal_code" in payload:
+        location.postal_code = payload.get("postal_code")
+
+    try:
+        session.flush()
+    except IntegrityError as error:
+        session.rollback()
+        raise ApiError("LOCATION_CONFLICT", "A location with this code or name already exists.", 409) from error
+    return location
