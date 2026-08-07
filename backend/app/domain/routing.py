@@ -15,6 +15,7 @@ from app.errors import ApiError
 from app.models import (
     Doctor,
     Location,
+    Organization,
     Patient,
     PatientDoctorHistory,
     RoutingDecision,
@@ -306,6 +307,12 @@ class PhysicianRoutingService:
         )
 
     def _open_slots(self, organization_id: int, starts_after: datetime, ends_before: datetime) -> list[Slot]:
+        from app.domain.business_hours import is_within_business_hours
+
+        organization = self.session.get(Organization, organization_id)
+        if not organization:
+            return []
+
         statement: Select[tuple[Slot]] = (
             select(Slot)
             .where(
@@ -319,7 +326,8 @@ class PhysicianRoutingService:
             .options(selectinload(Slot.location), selectinload(Slot.doctor))
             .order_by(Slot.starts_at, Slot.id)
         )
-        return list(self.session.scalars(statement))
+        slots = list(self.session.scalars(statement))
+        return [slot for slot in slots if is_within_business_hours(slot.starts_at, slot.ends_at, organization.business_hours, organization.timezone)]
 
     def _eligibility_reason(
         self,

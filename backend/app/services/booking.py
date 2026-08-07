@@ -62,6 +62,14 @@ class BookingService:
                     "That appointment time is no longer available. Please choose another slot.",
                     409,
                 )
+
+            from app.domain.business_hours import is_within_business_hours
+            if not is_within_business_hours(slot.starts_at, slot.ends_at, slot.organization.business_hours, slot.organization.timezone):
+                raise ApiError(
+                    "SLOT_OUTSIDE_BUSINESS_HOURS",
+                    "The selected slot falls outside of the clinic's operating hours.",
+                    422
+                )
             location_link = self.session.scalar(
                 select(DoctorLocation).where(
                     DoctorLocation.doctor_id == slot.doctor_id,

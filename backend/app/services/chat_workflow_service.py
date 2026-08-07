@@ -524,11 +524,19 @@ class ChatWorkflowService:
             raise ApiError("SLOT_NOT_OFFERED", "The selected slot was not offered for this intake.", 422)
 
     def _session_payload(self, chat_session: ChatSession, *, assistant_message: object | None = None) -> dict[str, Any]:
+        from app.domain.routing_action import compute_routing_action
         routing_result = chat_session.routing_result_json or {}
+        action = compute_routing_action(
+            chat_status=chat_session.status,
+            escalation_type=chat_session.escalation_type,
+            routing_result=routing_result,
+            is_clarifying=chat_session.status == ChatState.COLLECTING_INTAKE
+        )
         payload: dict[str, Any] = {
             "sessionId": chat_session.id,
             "status": chat_session.status,
             "currentStep": chat_session.current_step,
+            "routingAction": action.value,
             "patient": {
                 "id": chat_session.patient.id,
                 "fullName": chat_session.patient.full_name,

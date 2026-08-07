@@ -67,6 +67,7 @@ class ConversationOrchestrator:
             self._persist_call_state(call_id, state, doctors, locations)
         missing = self._missing_required_fields(state)
         if missing:
+            from app.domain.routing_action import compute_routing_action
             return {
                 "status": "clarification_required",
                 "intent": _intent_json(intent),
@@ -74,6 +75,7 @@ class ConversationOrchestrator:
                 "missing_fields": missing,
                 "clarification_question": intent.clarification_question or self._clarification_for(missing),
                 "routing": None,
+                "routing_action": compute_routing_action(chat_status="clarification_required").value,
             }
 
         doctor_id = (
@@ -99,6 +101,7 @@ class ConversationOrchestrator:
             ),
             persist=bool(call_id),
         )
+        from app.domain.routing_action import compute_routing_action
         return {
             "status": "routing_ready",
             "intent": _intent_json(intent),
@@ -106,6 +109,7 @@ class ConversationOrchestrator:
             "missing_fields": [],
             "clarification_question": None,
             "routing": routing,
+            "routing_action": compute_routing_action(chat_status="routing_ready", routing_result=routing).value,
         }
 
     @staticmethod

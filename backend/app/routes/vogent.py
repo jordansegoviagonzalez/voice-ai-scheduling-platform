@@ -149,6 +149,8 @@ def vogent_routing(organization_slug: str | None = None):  # type: ignore[no-unt
                 call.redirect_summary = result["caller_safe_summary"]
                 call.ended_at = datetime.now(UTC)
         recommended = result["recommended"]
+        from app.domain.routing_action import compute_routing_action
+        action = compute_routing_action(chat_status="routing_ready", routing_result=result)
         return (
             {
                 "summary": result["caller_safe_summary"],
@@ -172,6 +174,7 @@ def vogent_routing(organization_slug: str | None = None):  # type: ignore[no-unt
                     if item["is_preferred_doctor"]
                 ],
                 "fallback_explanation": result["fallback_explanation"],
+                "routing_action": action.value,
             },
             200,
         )
