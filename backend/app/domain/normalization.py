@@ -34,7 +34,7 @@ BODY_PARTS = {
     "General": {"general", "general medicine", "general care"},
     "Primary Care": {"primary care", "family medicine", "internal medicine", "pcp"},
     "Heart/Circulation": {"heart", "cardiology", "cardiac", "circulation", "palpitations"},
-    "Lungs/Breathing": {"lungs", "lung", "pulmonology", "breathing", "shortness of breath", "cough"},
+    "Lungs/Breathing": {"lungs", "lung", "pulmonology", "breathing", "shortness of breath", "cough", "respiratory"},
     "Mouth/Teeth/Tongue": {
         "mouth",
         "tooth",
@@ -58,11 +58,11 @@ BODY_PARTS = {
         "vomiting",
     },
     "Brain/Nerves": {"brain", "nerve", "nerves", "neurology", "headache", "dizziness", "numbness", "tingling"},
-    "Kidneys/Urinary": {"kidney", "kidneys", "urinary", "urine", "urology", "bladder"},
+    "Kidneys/Urinary": {"kidney", "kidneys", "urinary", "urine", "urology", "bladder", "genitourinary"},
     "Reproductive/Pelvic": {"obgyn", "ob/gyn", "gynecology", "reproductive", "pelvic", "pregnancy"},
     "Pediatrics": {"pediatrics", "pediatric", "child", "children", "kid", "kids", "child wellness"},
     "Diabetes/Thyroid": {"endocrine", "endocrinology", "diabetes", "thyroid"},
-    "Mental Health": {"mental health", "behavior", "behaviour", "anxiety", "depression"},
+    "Mental Health": {"mental health", "behavior", "behaviour", "anxiety", "depression", "psychological", "psychiatric"},
     "Injury/Wounds": {"injury", "wound", "wounds", "cut", "laceration"},
     "Bones/Joints/Muscles": {"bone", "bones", "joint", "joints", "muscle", "muscles", "orthopedics"},
 }
@@ -336,8 +336,15 @@ def normalize_issue_type(value: str) -> str:
     exact = {
         "fracture": "Fracture",
         "joint replacement": "Joint Replacement",
-        "sports medicine": "Sports Medicine",
+        "general orthopedics": "General Orthopedics",
+        "general ortho": "General Orthopedics",
         "general": "General",
+        "routine check": "General",
+        "general appointment": "General",
+        "spine appointment": "General",
+        "checkup": "General",
+        "check-up": "General",
+        "sports medicine": "Sports Medicine",
         "pain": "Pain",
         "swelling": "Swelling",
         "injury": "Injury",
@@ -381,33 +388,43 @@ def normalize_issue_type(value: str) -> str:
         return "General"
     if {"bleeding", "blood"} & tokens:
         return "Bleeding"
-    if {"rash", "itching", "itchy"} & tokens:
+    if {"rash", "itching", "itchy", "eczema", "acne", "skin"} & tokens:
         return "Rash/Itching"
-    if {"infection", "infected"} & tokens:
+    if {"infection", "infected", "fever", "strep", "uti"} & tokens:
         return "Infection"
     if {"numbness", "numb", "tingling"} & tokens:
         return "Numbness/Tingling"
     if "weakness" in tokens:
         return "Weakness"
-    if {"breathing", "breath", "cough"} & tokens:
+    if {"breathing", "breath", "cough", "wheezing", "asthma"} & tokens:
         return "Breathing Concern"
     if {"followup"} & tokens or re.search(r"\bfollow[-\s]*up\b", cleaned):
         return "Follow-up"
-    if "routine" in tokens and {"consult", "consultation", "visit"} & tokens:
+    if "routine" in tokens and {"consult", "consultation", "visit", "physical", "checkup"} & tokens:
         return "Routine Consult"
-    if {"wellness", "preventive", "prevention"} & tokens:
+    if {"wellness", "preventive", "prevention", "vaccine", "vaccines"} & tokens:
         return "Preventive/Wellness"
     if {"medication", "refill", "prescription"} & tokens:
         return "Medication/Refill"
-    if "lab" in tokens or re.search(r"\btest\s+result\b", cleaned):
+    if "lab" in tokens or re.search(r"\btest\s+result\b", cleaned) or "mri" in tokens or "xray" in tokens or "results" in tokens:
         return "Lab/Test Result"
+    if {"referral", "referrals"} & tokens:
+        return "Referral"
+    if {"admin", "paperwork", "form", "forms", "billing", "insurance", "record", "records"} & tokens:
+        return "Administrative"
+    if {"dental", "cleaning", "tooth", "teeth"} & tokens:
+        return "Dental"
     if {"injury", "injured", "wound", "cut"} & tokens:
         return "Injury"
     if "swelling" in tokens or "swollen" in tokens:
         return "Swelling"
-    if {"pain", "hurts", "hurt", "ache", "aches", "sore", "headache", "earache"} & tokens:
+    if {"pain", "hurts", "hurt", "ache", "aches", "sore", "headache", "earache", "stomach", "nausea", "arthritis"} & tokens:
         return "Pain"
-    if "consultation" in tokens or "consult" in tokens:
+    if {"anxiety", "depression", "panic", "stress", "mental", "behavioral", "counseling"} & tokens:
+        return "General" # Mapped to general for behavioral health
+    if {"diabetes", "anemia", "hypertension", "glaucoma", "migraine", "lump", "neoplasm"} & tokens:
+        return "General" # Chronic disease follow-ups or general consults
+    if "consultation" in tokens or "consult" in tokens or "physical" in tokens:
         return "General"
     raise ApiError(
         "ISSUE_TYPE_CLARIFICATION_REQUIRED",

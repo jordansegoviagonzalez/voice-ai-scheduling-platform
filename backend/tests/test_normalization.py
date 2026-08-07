@@ -16,7 +16,7 @@ from app.errors import ApiError
         ("knee replacement consultation", "Joint Replacement"),
         ("ACL injury from soccer", "Sports Medicine"),
         ("general hip pain", "General"),
-        ("tooth pain", "Pain"),
+        ("tooth pain", "Dental"),
         ("rash and itching", "Rash/Itching"),
         ("routine heart follow-up", "Follow-up"),
         ("shortness of breath", "Breathing Concern"),
