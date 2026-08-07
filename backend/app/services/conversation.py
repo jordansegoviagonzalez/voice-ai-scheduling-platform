@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.routing import PhysicianRoutingService, RoutingRequest
+from app.errors import ApiError
 from app.integrations.openai import OpenAIIntentAdapter, StructuredIntent
 from app.models import Call, Doctor, Location
 from app.services.integration_status import OPENAI_INTEGRATION, record_integration_result
@@ -32,8 +33,9 @@ class ConversationOrchestrator:
         previous_state: dict[str, Any] | None = None,
         patient_id: int | None = None,
         call_id: int | None = None,
+        organization_id: int | None = None,
     ) -> dict[str, Any]:
-        organization_id = self._organization_id(call_id)
+        organization_id = self._organization_id(call_id, explicit_organization_id=organization_id)
         doctors = list(
             self.session.scalars(
                 select(Doctor)
@@ -171,11 +173,19 @@ class ConversationOrchestrator:
         if state.get("preferred_location_code"):
             call.preferred_location_id = self._location_id_for_code(str(state["preferred_location_code"]), locations)
 
-    def _organization_id(self, call_id: int | None) -> int:
+    def _organization_id(self, call_id: int | None, *, explicit_organization_id: int | None = None) -> int:
         if call_id is not None:
             call = self.session.get(Call, call_id)
             if call is not None:
+                if explicit_organization_id is not None and call.organization_id != explicit_organization_id:
+                    raise ApiError(
+                        "ORGANIZATION_CONTEXT_MISMATCH",
+                        "The requested call does not belong to this organization.",
+                        409,
+                    )
                 return call.organization_id
+        if explicit_organization_id is not None:
+            return explicit_organization_id
         return default_organization_id(self.session)
 
 

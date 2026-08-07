@@ -66,6 +66,15 @@ Platform-admin views may list multiple organizations, but organization-owned rec
 
 Public chat routes must resolve organization context before creating or resuming a chat session.
 
+Implemented backend API paths:
+
+- `POST /api/chat/organizations/{organizationSlug}/sessions`
+- `POST /api/chat/organizations/{organizationSlug}/sessions/access`
+- `GET /api/chat/organizations/{organizationSlug}/sessions/{sessionId}`
+- `POST /api/chat/organizations/{organizationSlug}/sessions/{sessionId}/messages`
+- `POST /api/chat/organizations/{organizationSlug}/sessions/{sessionId}/appointments/select`
+- `POST /api/chat/organizations/{organizationSlug}/sessions/{sessionId}/appointments/confirm`
+
 Expected behavior:
 
 - A chat session created from `/o/{organizationSlug}/schedule` belongs to that organization.
@@ -81,9 +90,14 @@ Voice workflows must also resolve organization context before patient lookup, ro
 
 The preferred approach is to use an explicit organization-specific route or configured organization identifier.
 
-Example route pattern:
+Implemented backend API paths:
 
-`/api/v1/organizations/{organizationSlug}/vogent/functions/{functionName}`
+- `POST /api/v1/organizations/slug/{organizationSlug}/vogent/functions/patient-lookup`
+- `POST /api/v1/organizations/slug/{organizationSlug}/vogent/functions/interpret-intent`
+- `POST /api/v1/organizations/slug/{organizationSlug}/vogent/functions/routing-recommendations`
+- `POST /api/v1/organizations/slug/{organizationSlug}/vogent/functions/confirm-slot`
+- `POST /api/v1/organizations/slug/{organizationSlug}/vogent/functions/book-appointment`
+- `POST /api/v1/organizations/slug/{organizationSlug}/vogent/webhooks`
 
 Alternative future options may include:
 
@@ -102,6 +116,8 @@ It may be used for:
 - Existing single-organization routes during the transition.
 - Backfilled records from earlier project phases.
 - Internal compatibility while explicit organization routes are being added.
+
+Legacy compatibility routes such as `/api/chat/sessions`, `/api/v1/routing/recommendations`, `/api/v1/protocol`, `/api/v1/slots`, and `/api/v1/vogent/...` still use the default organization. New explicit organization routes resolve the slug first and never silently fall back to the default organization.
 
 It must not be used as a silent fallback for new explicit multi-organization routes.
 

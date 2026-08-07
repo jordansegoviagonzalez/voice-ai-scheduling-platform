@@ -9,7 +9,7 @@ from app.domain.normalization import BODY_PARTS, ISSUE_TYPES
 from app.errors import ApiError
 from app.extensions import get_session
 from app.models import Doctor, Location
-from app.services.organization_context import default_organization_id
+from app.services.organization_context import default_organization_id, explicit_organization_id_from_slug
 from app.services.serializers import doctor_json, location_json
 
 bp = Blueprint("protocol", __name__)
@@ -28,6 +28,14 @@ def _doctor_query(organization_id: int):  # type: ignore[no-untyped-def]
 def list_doctors():  # type: ignore[no-untyped-def]
     session = get_session()
     doctors = list(session.scalars(_doctor_query(default_organization_id(session))))
+    return jsonify({"doctors": [doctor_json(item) for item in doctors]})
+
+
+@bp.get("/organizations/slug/<organization_slug>/doctors")
+def list_organization_slug_doctors(organization_slug: str):  # type: ignore[no-untyped-def]
+    session = get_session()
+    organization_id = explicit_organization_id_from_slug(session, organization_slug)
+    doctors = list(session.scalars(_doctor_query(organization_id)))
     return jsonify({"doctors": [doctor_json(item) for item in doctors]})
 
 
@@ -51,20 +59,40 @@ def list_locations():  # type: ignore[no-untyped-def]
     return jsonify({"locations": [location_json(item) for item in locations]})
 
 
+@bp.get("/organizations/slug/<organization_slug>/locations")
+def list_organization_slug_locations(organization_slug: str):  # type: ignore[no-untyped-def]
+    session = get_session()
+    organization_id = explicit_organization_id_from_slug(session, organization_slug)
+    locations = sorted(
+        session.scalars(select(Location).where(Location.organization_id == organization_id)).all(),
+        key=location_sort_key,
+    )
+    return jsonify({"locations": [location_json(item) for item in locations]})
+
+
 @bp.get("/protocol")
 def get_protocol():  # type: ignore[no-untyped-def]
     session = get_session()
     organization_id = default_organization_id(session)
+    return jsonify(_protocol_payload(session, organization_id))
+
+
+@bp.get("/organizations/slug/<organization_slug>/protocol")
+def get_organization_slug_protocol(organization_slug: str):  # type: ignore[no-untyped-def]
+    session = get_session()
+    organization_id = explicit_organization_id_from_slug(session, organization_slug)
+    return jsonify(_protocol_payload(session, organization_id))
+
+
+def _protocol_payload(session, organization_id: int):  # type: ignore[no-untyped-def]
     doctors = list(session.scalars(_doctor_query(organization_id)))
     locations = sorted(
         session.scalars(select(Location).where(Location.organization_id == organization_id)).all(),
         key=location_sort_key,
     )
-    return jsonify(
-        {
-            "locations": [location_json(item) for item in locations],
-            "doctors": [doctor_json(item) for item in doctors],
-            "body_parts": list(BODY_PARTS),
-            "issue_types": list(ISSUE_TYPES),
-        }
-    )
+    return {
+        "locations": [location_json(item) for item in locations],
+        "doctors": [doctor_json(item) for item in doctors],
+        "body_parts": list(BODY_PARTS),
+        "issue_types": list(ISSUE_TYPES),
+    }

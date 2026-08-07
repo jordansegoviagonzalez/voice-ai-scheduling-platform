@@ -10,7 +10,7 @@ from app.domain.normalization import normalize_body_part, normalize_issue_type
 from app.extensions import get_session
 from app.models import Doctor, DoctorCapability, Slot
 from app.routes.common import int_or_none, parse_datetime
-from app.services.organization_context import default_organization_id
+from app.services.organization_context import default_organization_id, explicit_organization_id_from_slug
 from app.services.serializers import slot_json
 
 bp = Blueprint("slots", __name__)
@@ -18,6 +18,17 @@ bp = Blueprint("slots", __name__)
 
 @bp.get("/slots")
 def list_slots():  # type: ignore[no-untyped-def]
+    session = get_session()
+    return _list_slots(default_organization_id(session))
+
+
+@bp.get("/organizations/slug/<organization_slug>/slots")
+def list_organization_slug_slots(organization_slug: str):  # type: ignore[no-untyped-def]
+    session = get_session()
+    return _list_slots(explicit_organization_id_from_slug(session, organization_slug))
+
+
+def _list_slots(organization_id: int):  # type: ignore[no-untyped-def]
     doctor_id = int_or_none(request.args.get("doctor_id"), "doctor_id")
     location_id = int_or_none(request.args.get("location_id"), "location_id")
     body_part = request.args.get("body_part")
@@ -25,7 +36,6 @@ def list_slots():  # type: ignore[no-untyped-def]
     starts_after = parse_datetime(request.args.get("starts_after"), "starts_after") or datetime.now(UTC)
     ends_before = parse_datetime(request.args.get("ends_before"), "ends_before") or starts_after + timedelta(days=14)
     session = get_session()
-    organization_id = default_organization_id(session)
 
     statement = (
         select(Slot)

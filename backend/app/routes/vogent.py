@@ -21,12 +21,18 @@ from app.services.confirmation import BookingConfirmationService
 from app.services.conversation import ConversationOrchestrator
 from app.services.idempotency import IdempotencyService
 from app.services.integration_status import VOGENT_INTEGRATION, record_integration_result
-from app.services.organization_context import default_organization_id
+from app.services.organization_context import (
+    assert_call_matches_organization,
+    assert_slot_matches_organization,
+    call_organization_id,
+    default_organization_id,
+    explicit_organization_id_from_slug,
+)
 
 bp = Blueprint("vogent", __name__)
 
 TERMINAL_CALL_STATUSES = {"SCHEDULED", "FAILED", "ABANDONED", "REDIRECTED"}
-FunctionHandler = Callable[[Session], tuple[dict[str, Any], int]]
+FunctionHandler = Callable[[Session, int | None], tuple[dict[str, Any], int]]
 
 
 def _require_function_secret() -> None:
@@ -44,14 +50,21 @@ def _idempotent_function_response(
     operation: str,
     payload: dict[str, Any],
     handler: FunctionHandler,
+    organization_slug: str | None = None,
 ) -> tuple[Response, int]:
     session = get_session()
+    explicit_organization_id = (
+        explicit_organization_id_from_slug(session, organization_slug) if organization_slug is not None else None
+    )
+    operation_key = (
+        f"{operation}:organization:{explicit_organization_id}" if explicit_organization_id is not None else operation
+    )
     service = IdempotencyService(session)
-    started = service.begin_request(provider="vogent", operation=operation, payload=payload, request=request)
+    started = service.begin_request(provider="vogent", operation=operation_key, payload=payload, request=request)
     if started.is_duplicate:
         assert started.duplicate_status_code is not None
         return jsonify(started.duplicate_response), started.duplicate_status_code
-    response, status_code = handler(session)
+    response, status_code = handler(session, explicit_organization_id)
     service.complete_request(started.log, response=response, status_code=status_code)
     session.commit()
     return jsonify(response), status_code
@@ -69,12 +82,14 @@ def _in_production_live_context() -> bool:
 
 
 @bp.post("/vogent/functions/patient-lookup")
-def vogent_patient_lookup():  # type: ignore[no-untyped-def]
+@bp.post("/organizations/slug/<organization_slug>/vogent/functions/patient-lookup")
+def vogent_patient_lookup(organization_slug: str | None = None):  # type: ignore[no-untyped-def]
     _require_function_secret()
     payload = json_body(request)
     require_fields(payload, "phone", "date_of_birth")
 
-    def handler(session):  # type: ignore[no-untyped-def]
+    def handler(session, explicit_organization_id):  # type: ignore[no-untyped-def]
+        _ = explicit_organization_id
         phone = normalize_phone(bounded_string(payload, "phone", max_length=32) or "")
         dob = normalize_date_of_birth(bounded_string(payload, "date_of_birth", max_length=64) or "")
         patient = session.scalar(select(Patient).where(Patient.phone == phone, Patient.date_of_birth == dob))
@@ -87,19 +102,23 @@ def vogent_patient_lookup():  # type: ignore[no-untyped-def]
             200,
         )
 
-    return _idempotent_function_response("patient-lookup", payload, handler)
+    return _idempotent_function_response("patient-lookup", payload, handler, organization_slug)
 
 
 @bp.post("/vogent/functions/routing-recommendations")
-def vogent_routing():  # type: ignore[no-untyped-def]
+@bp.post("/organizations/slug/<organization_slug>/vogent/functions/routing-recommendations")
+def vogent_routing(organization_slug: str | None = None):  # type: ignore[no-untyped-def]
     _require_function_secret()
     payload = json_body(request)
     require_fields(payload, "patient_status", "body_part", "issue_type")
 
-    def handler(session):  # type: ignore[no-untyped-def]
+    def handler(session, explicit_organization_id):  # type: ignore[no-untyped-def]
         call_id = int_or_none(payload.get("call_id"), "call_id")
-        call = session.get(Call, call_id) if call_id is not None else None
-        organization_id = call.organization_id if call is not None else default_organization_id(session)
+        organization_id = call_organization_id(
+            session,
+            call_id=call_id,
+            explicit_organization_id=explicit_organization_id,
+        )
         result = PhysicianRoutingService(session).recommend(
             RoutingRequest(
                 organization_id=organization_id,
@@ -147,16 +166,17 @@ def vogent_routing():  # type: ignore[no-untyped-def]
             200,
         )
 
-    return _idempotent_function_response("routing-recommendations", payload, handler)
+    return _idempotent_function_response("routing-recommendations", payload, handler, organization_slug)
 
 
 @bp.post("/vogent/functions/interpret-intent")
-def vogent_interpret_intent():  # type: ignore[no-untyped-def]
+@bp.post("/organizations/slug/<organization_slug>/vogent/functions/interpret-intent")
+def vogent_interpret_intent(organization_slug: str | None = None):  # type: ignore[no-untyped-def]
     _require_function_secret()
     payload = json_body(request)
     require_fields(payload, "raw_user_text")
 
-    def handler(session):  # type: ignore[no-untyped-def]
+    def handler(session, explicit_organization_id):  # type: ignore[no-untyped-def]
         try:
             previous_state = payload.get("previous_state")
             raw_user_text = bounded_string(
@@ -169,21 +189,34 @@ def vogent_interpret_intent():  # type: ignore[no-untyped-def]
                 previous_state=previous_state if isinstance(previous_state, dict) else None,
                 patient_id=int_or_none(payload.get("patient_id"), "patient_id"),
                 call_id=int_or_none(payload.get("call_id"), "call_id"),
+                organization_id=explicit_organization_id,
             )
         except OpenAIIntegrationError as error:
             raise ApiError(error.code, error.message, 503 if error.retryable else 502) from error
         return result, 200
 
-    return _idempotent_function_response("interpret-intent", payload, handler)
+    return _idempotent_function_response("interpret-intent", payload, handler, organization_slug)
 
 
 @bp.post("/vogent/functions/confirm-slot")
-def vogent_confirm_slot():  # type: ignore[no-untyped-def]
+@bp.post("/organizations/slug/<organization_slug>/vogent/functions/confirm-slot")
+def vogent_confirm_slot(organization_slug: str | None = None):  # type: ignore[no-untyped-def]
     _require_function_secret()
     payload = json_body(request)
     require_fields(payload, "call_id", "patient_id", "slot_id", "body_part", "issue_type")
 
-    def handler(session):  # type: ignore[no-untyped-def]
+    def handler(session, explicit_organization_id):  # type: ignore[no-untyped-def]
+        if explicit_organization_id is not None:
+            assert_call_matches_organization(
+                session,
+                call_id=int(payload["call_id"]),
+                organization_id=explicit_organization_id,
+            )
+            assert_slot_matches_organization(
+                session,
+                slot_id=int(payload["slot_id"]),
+                organization_id=explicit_organization_id,
+            )
         confirmation = BookingConfirmationService(session).confirm(
             call_id=int(payload["call_id"]),
             patient_id=int(payload["patient_id"]),
@@ -204,16 +237,26 @@ def vogent_confirm_slot():  # type: ignore[no-untyped-def]
             201,
         )
 
-    return _idempotent_function_response("confirm-slot", payload, handler)
+    return _idempotent_function_response("confirm-slot", payload, handler, organization_slug)
 
 
 @bp.post("/vogent/functions/book-appointment")
-def vogent_book():  # type: ignore[no-untyped-def]
+@bp.post("/organizations/slug/<organization_slug>/vogent/functions/book-appointment")
+def vogent_book(organization_slug: str | None = None):  # type: ignore[no-untyped-def]
     _require_function_secret()
     payload = json_body(request)
     require_fields(payload, "patient_id", "slot_id", "body_part", "issue_type", "confirmation_token")
 
-    def handler(session):  # type: ignore[no-untyped-def]
+    def handler(session, explicit_organization_id):  # type: ignore[no-untyped-def]
+        if explicit_organization_id is not None:
+            call_id = int_or_none(payload.get("call_id"), "call_id")
+            if call_id is not None:
+                assert_call_matches_organization(session, call_id=call_id, organization_id=explicit_organization_id)
+            assert_slot_matches_organization(
+                session,
+                slot_id=int(payload["slot_id"]),
+                organization_id=explicit_organization_id,
+            )
         appointment = BookingService(session).book(
             patient_id=int(payload["patient_id"]),
             slot_id=int(payload["slot_id"]),
@@ -234,11 +277,12 @@ def vogent_book():  # type: ignore[no-untyped-def]
             201,
         )
 
-    return _idempotent_function_response("book-appointment", payload, handler)
+    return _idempotent_function_response("book-appointment", payload, handler, organization_slug)
 
 
 @bp.post("/vogent/webhooks")
-def vogent_webhooks():  # type: ignore[no-untyped-def]
+@bp.post("/organizations/slug/<organization_slug>/vogent/webhooks")
+def vogent_webhooks(organization_slug: str | None = None):  # type: ignore[no-untyped-def]
     raw_body = request.get_data(cache=True)
     secret = current_app.config.get("VOGENT_WEBHOOK_SECRET")
     if secret:
@@ -253,6 +297,10 @@ def vogent_webhooks():  # type: ignore[no-untyped-def]
     nested_payload = payload.get("payload")
     data: dict[str, Any] = nested_payload if isinstance(nested_payload, dict) else payload
     session = get_session()
+    explicit_organization_id = (
+        explicit_organization_id_from_slug(session, organization_slug) if organization_slug is not None else None
+    )
+    organization_id = explicit_organization_id or default_organization_id(session)
     external_id = str(data.get("dial_id", "")) if data.get("dial_id") is not None else None
     idempotency = IdempotencyService(session)
     event_record = idempotency.record_event(
@@ -266,6 +314,12 @@ def vogent_webhooks():  # type: ignore[no-untyped-def]
         if event == "dial.inbound" and external_id:
             call = session.scalar(select(Call).where(Call.external_call_id == external_id))
             if call is not None:
+                if explicit_organization_id is not None and call.organization_id != explicit_organization_id:
+                    raise ApiError(
+                        "ORGANIZATION_CONTEXT_MISMATCH",
+                        "The requested call does not belong to this organization.",
+                        409,
+                    )
                 return jsonify(
                     {
                         "call_agent_input": {"internal_call_id": str(call.id)},
@@ -281,7 +335,7 @@ def vogent_webhooks():  # type: ignore[no-untyped-def]
         call = session.scalar(select(Call).where(Call.external_call_id == external_id))
         if call is None:
             call = Call(
-                organization_id=default_organization_id(session),
+                organization_id=organization_id,
                 external_call_id=external_id,
                 status="IN_PROGRESS",
                 caller_phone=str(data.get("source_number", "unknown")),
@@ -289,6 +343,12 @@ def vogent_webhooks():  # type: ignore[no-untyped-def]
                 transcript=[],
             )
             session.add(call)
+        elif explicit_organization_id is not None and call.organization_id != explicit_organization_id:
+            raise ApiError(
+                "ORGANIZATION_CONTEXT_MISMATCH",
+                "The requested call does not belong to this organization.",
+                409,
+            )
         idempotency.mark_event_processed(event_record.log)
         if _in_production_live_context():
             record_integration_result(
@@ -306,6 +366,12 @@ def vogent_webhooks():  # type: ignore[no-untyped-def]
     call = session.scalar(select(Call).where(Call.external_call_id == external_id))
     if call is None:
         raise ApiError("CALL_NOT_FOUND", "No call record matches this Vogent dial.", 404)
+    if explicit_organization_id is not None and call.organization_id != explicit_organization_id:
+        raise ApiError(
+            "ORGANIZATION_CONTEXT_MISMATCH",
+            "The requested call does not belong to this organization.",
+            409,
+        )
 
     if event == "dial.updated":
         status_map = {

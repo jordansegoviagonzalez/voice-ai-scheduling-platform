@@ -14,7 +14,7 @@ from app.services.booking import BookingService
 from app.services.chat_session_service import ChatSessionService
 from app.services.chat_workflow_service import ChatWorkflowService
 from app.services.escalation_service import EscalationService
-from app.services.organization_context import default_organization_id
+from app.services.organization_context import default_organization_id, explicit_organization_id_from_slug
 from app.services.patient_access_service import PatientAccessService
 from app.services.session_security import (
     has_patient_session,
@@ -28,9 +28,13 @@ from app.services.session_security import (
 chat_bp = Blueprint("chat", __name__, url_prefix="/api/chat")
 
 
-def get_services() -> tuple[ChatSessionService, ChatWorkflowService]:
+def get_services(organization_slug: str | None = None) -> tuple[ChatSessionService, ChatWorkflowService]:
     db_session = get_db_session()
-    organization_id = default_organization_id(db_session)
+    organization_id = (
+        explicit_organization_id_from_slug(db_session, organization_slug)
+        if organization_slug is not None
+        else default_organization_id(db_session)
+    )
     chat_service = ChatSessionService(db_session)
     ai_client = OpenAIIntakeClient(
         current_app.config.get("OPENAI_API_KEY"),
@@ -53,12 +57,21 @@ def get_services() -> tuple[ChatSessionService, ChatWorkflowService]:
 
 @chat_bp.route("/sessions", methods=["POST"])
 def create_session() -> ResponseReturnValue:
+    return _create_session()
+
+
+@chat_bp.route("/organizations/<organization_slug>/sessions", methods=["POST"])
+def create_organization_session(organization_slug: str) -> ResponseReturnValue:
+    return _create_session(organization_slug)
+
+
+def _create_session(organization_slug: str | None = None) -> ResponseReturnValue:
     data = json_body(request)
     patient_mode = data.get("patientMode")
     if patient_mode not in {"new", "returning"}:
         raise ApiError("VALIDATION_ERROR", "patientMode must be new or returning.", 422)
 
-    chat_service, workflow = get_services()
+    chat_service, workflow = get_services(organization_slug)
     if patient_mode == "returning":
         patient = workflow.patient_access.verify_returning_patient(
             email=_string_field(data, "email", max_length=255),
@@ -74,12 +87,21 @@ def create_session() -> ResponseReturnValue:
 
 @chat_bp.route("/sessions/access", methods=["POST"])
 def create_access_session() -> ResponseReturnValue:
+    return _create_access_session()
+
+
+@chat_bp.route("/organizations/<organization_slug>/sessions/access", methods=["POST"])
+def create_organization_access_session(organization_slug: str) -> ResponseReturnValue:
+    return _create_access_session(organization_slug)
+
+
+def _create_access_session(organization_slug: str | None = None) -> ResponseReturnValue:
     data = json_body(request)
     patient_mode = data.get("patientMode")
     if patient_mode != "returning":
         raise ApiError("VALIDATION_ERROR", "patientMode must be returning.", 422)
 
-    chat_service, workflow = get_services()
+    chat_service, workflow = get_services(organization_slug)
     chat_session = chat_service.create_session(organization_id=workflow.organization_id, patient_mode="returning")
     _remember_session(chat_session.id)
     payload = workflow._session_payload(workflow._session_or_404(chat_session.id))
@@ -90,42 +112,87 @@ def create_access_session() -> ResponseReturnValue:
 
 @chat_bp.route("/sessions/<int:session_id>/patient-access", methods=["POST"])
 def patient_access(session_id: int) -> ResponseReturnValue:
+    return _patient_access(session_id)
+
+
+@chat_bp.route("/organizations/<organization_slug>/sessions/<int:session_id>/patient-access", methods=["POST"])
+def organization_patient_access(organization_slug: str, session_id: int) -> ResponseReturnValue:
+    return _patient_access(session_id, organization_slug)
+
+
+def _patient_access(session_id: int, organization_slug: str | None = None) -> ResponseReturnValue:
     _require_session_access(session_id)
-    _, workflow = get_services()
+    _, workflow = get_services(organization_slug)
     payload = workflow.authenticate_returning_patient(session_id, request.json or {})
     return jsonify(payload)
 
 
 @chat_bp.route("/sessions/<int:session_id>/messages", methods=["POST"])
 def handle_message(session_id: int) -> ResponseReturnValue:
+    return _handle_message(session_id)
+
+
+@chat_bp.route("/organizations/<organization_slug>/sessions/<int:session_id>/messages", methods=["POST"])
+def organization_handle_message(organization_slug: str, session_id: int) -> ResponseReturnValue:
+    return _handle_message(session_id, organization_slug)
+
+
+def _handle_message(session_id: int, organization_slug: str | None = None) -> ResponseReturnValue:
     _require_session_access(session_id)
-    _, workflow = get_services()
+    _, workflow = get_services(organization_slug)
     payload = workflow.handle_message(session_id, (request.json or {}).get("message", ""))
     return jsonify(payload)
 
 
 @chat_bp.route("/sessions/<int:session_id>", methods=["GET"])
 def get_session(session_id: int) -> ResponseReturnValue:
+    return _get_session(session_id)
+
+
+@chat_bp.route("/organizations/<organization_slug>/sessions/<int:session_id>", methods=["GET"])
+def get_organization_session(organization_slug: str, session_id: int) -> ResponseReturnValue:
+    return _get_session(session_id, organization_slug)
+
+
+def _get_session(session_id: int, organization_slug: str | None = None) -> ResponseReturnValue:
     _require_session_access(session_id)
-    _, workflow = get_services()
+    _, workflow = get_services(organization_slug)
     return jsonify(workflow._session_payload(workflow._session_or_404(session_id)))
 
 
 @chat_bp.route("/sessions/<int:session_id>/appointments/select", methods=["POST"])
 def select_appointment(session_id: int) -> ResponseReturnValue:
+    return _select_appointment(session_id)
+
+
+@chat_bp.route("/organizations/<organization_slug>/sessions/<int:session_id>/appointments/select", methods=["POST"])
+def select_organization_appointment(organization_slug: str, session_id: int) -> ResponseReturnValue:
+    return _select_appointment(session_id, organization_slug)
+
+
+def _select_appointment(session_id: int, organization_slug: str | None = None) -> ResponseReturnValue:
     _require_session_access(session_id)
     slot_id = (request.json or {}).get("slotId")
     if not isinstance(slot_id, int):
         raise ApiError("VALIDATION_ERROR", "slotId is required.", 422, {"slotId": ["Required integer"]})
-    _, workflow = get_services()
+    _, workflow = get_services(organization_slug)
     payload = workflow.select_appointment(session_id, slot_id)
     return jsonify(payload), 200
 
 
 @chat_bp.route("/sessions/<int:session_id>/appointments/confirm", methods=["POST"])
 def confirm_appointment(session_id: int) -> ResponseReturnValue:
+    return _confirm_appointment(session_id)
+
+
+@chat_bp.route("/organizations/<organization_slug>/sessions/<int:session_id>/appointments/confirm", methods=["POST"])
+def confirm_organization_appointment(organization_slug: str, session_id: int) -> ResponseReturnValue:
+    return _confirm_appointment(session_id, organization_slug)
+
+
+def _confirm_appointment(session_id: int, organization_slug: str | None = None) -> ResponseReturnValue:
     _require_session_access(session_id)
-    _, workflow = get_services()
+    _, workflow = get_services(organization_slug)
     payload, status = workflow.confirm_appointment(session_id)
     return jsonify(payload), status
 
